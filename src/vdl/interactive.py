@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import sys
-import time
 
 from . import __version__
 from .downloader import DEFAULT_OUTPUT, Downloader
@@ -36,35 +35,32 @@ _ASCII = [
 ]
 
 
-def _check_and_prompt_update() -> None:
-    """Si une mise à jour est disponible, demande à l'utilisateur s'il veut l'installer."""
+def _auto_update() -> None:
+    """Met à jour automatiquement si une nouvelle version est disponible."""
     from .updater import do_update, get_latest_version
 
     latest = get_latest_version()
     if not latest:
         return
 
-    print(f"  {BOLD}{YELLOW}↑{RESET}  {t('update_available', version=latest)}")
+    print(f"  {BOLD}{YELLOW}↑{RESET}  {t('update_available', version=latest)}  {DIM}— mise à jour...{RESET}")
     print()
-    from .tui import confirm
-
-    if confirm(t("update_now"), default=True):
-        print()
-        do_update()
-        print()
-        animate_separator(color=CYAN)
-        print()
+    do_update()
+    print()
+    animate_separator(color=CYAN)
+    print()
 
 
 def _banner() -> None:
     clear_screen()
     print()
+    # ASCII art affiché d'un coup, sans délai ligne par ligne
     for i, line in enumerate(_ASCII):
         color = CYAN if i < 3 else BLUE
         print(f"{BOLD}{color}{line}{RESET}")
-        time.sleep(0.04)
     print()
-    type_print(t("banner_sub"), prefix=f"  {DIM}", delay=0.03)
+    # Seul le sous-titre a un effet typewriter (rapide)
+    type_print(t("banner_sub"), prefix=f"  {DIM}", delay=0.015)
     print(f"  {CYAN}v{__version__}{RESET}")
     print()
     animate_separator(color=CYAN)
@@ -154,7 +150,7 @@ def _history_flow() -> None:
 
 def run_interactive() -> None:
     _banner()
-    _check_and_prompt_update()
+    _auto_update()
 
     while True:
         action = select(

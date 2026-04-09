@@ -100,7 +100,7 @@ def animate_separator(width: int = 44, color: str = "") -> None:
     for _ in range(width):
         sys.stdout.write("─")
         sys.stdout.flush()
-        time.sleep(0.007)
+        time.sleep(0.004)
     sys.stdout.write(f"{RESET}\n")
     sys.stdout.flush()
 
