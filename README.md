@@ -9,7 +9,7 @@ Téléchargez des vidéos et de l'audio depuis YouTube, Vimeo, TikTok, SoundClou
 Collez cette commande dans le Terminal et appuiez sur Entrée :
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/PhilV1tt/VideoDownloader/main/install-mac.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/PhilV1tt/vdl/main/install-mac.sh)
 ```
 
 C'est tout. Le script installe tout automatiquement.
