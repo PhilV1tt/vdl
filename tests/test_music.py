@@ -165,13 +165,11 @@ class TestMusicPipeline:
         f = tmp_path / "nonexistent.mp3"
         music_pipeline(f, {})  # should return immediately without error
 
-    def test_pipeline_missing_deps(self, tmp_path: Path, capsys):
+    def test_pipeline_missing_deps(self, tmp_path: Path):
         f = tmp_path / "song.mp3"
         f.write_bytes(b"")
-        with patch("vdl.music._check_deps", return_value=False):
-            music_pipeline(f, {})
-        captured = capsys.readouterr()
-        assert "pip install" in captured.err
+        with patch("vdl.music._auto_install_deps", return_value=False):
+            music_pipeline(f, {})  # should return without calling lookup
 
     def test_pipeline_success(self, tmp_path: Path):
         f = tmp_path / "song.mp3"
@@ -179,7 +177,7 @@ class TestMusicPipeline:
         info = {"title": "Bohemian Rhapsody", "uploader": "Queen"}
         mb_meta = {"title": "Bohemian Rhapsody", "artist": "Queen"}
         with (
-            patch("vdl.music._check_deps", return_value=True),
+            patch("vdl.music._auto_install_deps", return_value=True),
             patch("vdl.music.lookup_metadata", return_value=mb_meta) as mock_lookup,
             patch("vdl.music.write_tags") as mock_tags,
             patch("vdl.music.import_to_music_app", return_value=True) as mock_import,
@@ -194,7 +192,7 @@ class TestMusicPipeline:
         f = tmp_path / "song.mp3"
         f.write_bytes(b"")
         with (
-            patch("vdl.music._check_deps", return_value=True),
+            patch("vdl.music._auto_install_deps", return_value=True),
             patch("vdl.music.lookup_metadata", return_value={}),
             patch("vdl.music.write_tags"),
             patch("vdl.music.import_to_music_app", return_value=False),

@@ -92,6 +92,8 @@ _S: dict[str, dict[str, str]] = {
         "music_import_error": "Erreur lors de l'import dans Apple Music.",
         "music_skip_import": "Import Apple Music/iTunes non disponible sur cette plateforme.",
         "music_missing_deps": "Dependances manquantes pour --music :",
+        "music_installing_deps": "Installation des dependances (mutagen, musicbrainzngs)...",
+        "music_install_failed": "Echec de l'installation des dependances.",
     },
     "en": {
         # Banner
@@ -169,6 +171,8 @@ _S: dict[str, dict[str, str]] = {
         "music_import_error": "Error importing into Apple Music.",
         "music_skip_import": "Apple Music/iTunes import not available on this platform.",
         "music_missing_deps": "Missing dependencies for --music:",
+        "music_installing_deps": "Installing dependencies (mutagen, musicbrainzngs)...",
+        "music_install_failed": "Failed to install dependencies.",
     },
 }
 

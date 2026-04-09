@@ -18,12 +18,35 @@ def _check_deps() -> bool:
     )
 
 
+def _auto_install_deps() -> bool:
+    """Installe mutagen et musicbrainzngs si absents. Retourne True si prêts."""
+    if _check_deps():
+        return True
+
+    import importlib
+    import subprocess
+
+    print(t("music_installing_deps"))
+    packages = ["mutagen", "musicbrainzngs"]
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "--quiet", *packages],
+            check=True,
+        )
+    except subprocess.CalledProcessError:
+        print(t("music_install_failed"), file=sys.stderr)
+        return False
+
+    importlib.invalidate_caches()
+    return _check_deps()
+
+
 def lookup_metadata(title: str, artist: str) -> dict[str, Any]:
     """Cherche les métadonnées sur MusicBrainz. Retourne dict vide si aucun match."""
     try:
         import musicbrainzngs
 
-        musicbrainzngs.set_useragent("vdl", "0.5.0", "https://github.com/PhilV1tt/vdl")
+        musicbrainzngs.set_useragent("vdl", "0.5.1", "https://github.com/PhilV1tt/vdl")
         result = musicbrainzngs.search_recordings(query=title, artist=artist, limit=5)
         recordings = result.get("recording-list", [])
         if not recordings:
@@ -180,10 +203,7 @@ def music_pipeline(file_path: Path | None, info: dict[str, Any]) -> None:
     if file_path is None or not file_path.exists():
         return
 
-    if not _check_deps():
-        print(t("music_missing_deps"), file=sys.stderr)
-        print("  pipx inject vdl mutagen musicbrainzngs", file=sys.stderr)
-        print("  # ou : pip install 'vdl[music]'", file=sys.stderr)
+    if not _auto_install_deps():
         return
 
     title = str(info.get("title", "") or file_path.stem)
