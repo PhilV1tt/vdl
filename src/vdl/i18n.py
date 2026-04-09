@@ -7,7 +7,7 @@ import locale
 
 def _detect_lang() -> str:
     try:
-        code = locale.getdefaultlocale()[0] or ""
+        code = locale.getlocale()[0] or ""
     except Exception:
         code = ""
     return "fr" if code.lower().startswith("fr") else "en"

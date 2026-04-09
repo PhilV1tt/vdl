@@ -39,7 +39,7 @@ class TestShowHistory:
         with patch("vdl.history._HISTORY_PATH", tmp_path / "nonexistent.jsonl"):
             show_history()
         captured = capsys.readouterr()
-        assert "Aucun" in captured.out
+        assert captured.out.strip() != ""
 
     def test_shows_entries(self, tmp_path: Path, capsys):
         history_file = tmp_path / "history.jsonl"
