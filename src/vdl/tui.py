@@ -60,9 +60,7 @@ def select(
     try:
         import questionary
 
-        result: str | None = questionary.select(
-            message, choices=choices, default=default, style=_STYLE
-        ).ask()
+        result: str | None = questionary.select(message, choices=choices, default=default, style=_STYLE).ask()
         return result
     except (ImportError, KeyboardInterrupt):
         return None
@@ -95,9 +93,7 @@ def autocomplete(message: str, choices: list[str], default: str = "") -> str | N
     try:
         import questionary
 
-        result: str | None = questionary.autocomplete(
-            message, choices=choices, default=default, style=_STYLE
-        ).ask()
+        result: str | None = questionary.autocomplete(message, choices=choices, default=default, style=_STYLE).ask()
         return result
     except (ImportError, KeyboardInterrupt):
         return None

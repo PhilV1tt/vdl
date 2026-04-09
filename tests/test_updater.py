@@ -40,10 +40,12 @@ class TestShouldCheck:
     def test_recent_cache_should_not_check(self, tmp_path: Path):
         cache = tmp_path / "update_check.json"
         cache.write_text(
-            json.dumps({
-                "last_check": datetime.now(tz=timezone.utc).isoformat(),
-                "latest": "0.2.0",
-            })
+            json.dumps(
+                {
+                    "last_check": datetime.now(tz=timezone.utc).isoformat(),
+                    "latest": "0.2.0",
+                }
+            )
         )
         with patch("vdl.updater._CACHE_PATH", cache):
             assert _should_check() is False
@@ -52,10 +54,12 @@ class TestShouldCheck:
         cache = tmp_path / "update_check.json"
         old_time = datetime.now(tz=timezone.utc) - timedelta(hours=25)
         cache.write_text(
-            json.dumps({
-                "last_check": old_time.isoformat(),
-                "latest": "0.2.0",
-            })
+            json.dumps(
+                {
+                    "last_check": old_time.isoformat(),
+                    "latest": "0.2.0",
+                }
+            )
         )
         with patch("vdl.updater._CACHE_PATH", cache):
             assert _should_check() is True
