@@ -46,7 +46,7 @@ fi
 
 # 5. vdl
 echo "→ Installation de vdl..."
-pipx install "git+https://github.com/Scarbote/vdl.git"
+pipx install "git+https://github.com/PhilV1tt/vdl.git"
 
 echo ""
 echo "╔══════════════════════════════════════════╗"
