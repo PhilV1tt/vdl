@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .i18n import t
-from .tui import BOLD, DIM, GREEN, RESET, YELLOW, Spinner, c
+from .tui import BOLD, DIM, RESET, YELLOW, Spinner, c, success_flash
 
 logger = logging.getLogger(__name__)
 
@@ -156,7 +156,8 @@ class Downloader:
                     print()
                     ydl.download([url])
 
-                printer.done(c(t("saved", path=self.output_dir), GREEN))
+                printer.done()
+                success_flash(t("saved", path=self.output_dir))
                 from .history import log_download
 
                 log_download(url, title, ext, self.output_dir, "ok")

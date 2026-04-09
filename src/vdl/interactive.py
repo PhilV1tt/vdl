@@ -8,7 +8,20 @@ import time
 from . import __version__
 from .downloader import DEFAULT_OUTPUT, Downloader
 from .i18n import t
-from .tui import BLUE, BOLD, CYAN, DIM, RESET, Spinner, select, text
+from .tui import (
+    BLUE,
+    BOLD,
+    CYAN,
+    DIM,
+    RESET,
+    Spinner,
+    animate_separator,
+    clear_screen,
+    fade_out,
+    select,
+    text,
+    type_print,
+)
 
 # ── Bannière ───────────────────────────────────────────────────────────────
 
@@ -23,12 +36,17 @@ _ASCII = [
 
 
 def _banner() -> None:
+    clear_screen()
     print()
     for i, line in enumerate(_ASCII):
         color = CYAN if i < 3 else BLUE
         print(f"{BOLD}{color}{line}{RESET}")
         time.sleep(0.04)
-    print(f"  {DIM}{t('banner_sub')}  {RESET}{CYAN}v{__version__}{RESET}")
+    print()
+    type_print(t("banner_sub"), prefix=f"  {DIM}", delay=0.03)
+    print(f"  {CYAN}v{__version__}{RESET}")
+    print()
+    animate_separator(color=CYAN)
     print()
 
 
@@ -127,6 +145,9 @@ def run_interactive() -> None:
         )
 
         if action is None or action == "quit":
+            print()
+            fade_out("bye", color=CYAN)
+            print()
             sys.exit(0)
 
         if action == "download":
@@ -140,11 +161,17 @@ def run_interactive() -> None:
                 continue
             _download_flow(url)
             print()
+            animate_separator()
+            print()
 
         elif action == "search":
             _search_flow()
             print()
+            animate_separator()
+            print()
 
         elif action == "history":
             _history_flow()
+            print()
+            animate_separator()
             print()

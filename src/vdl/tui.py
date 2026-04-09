@@ -47,6 +47,7 @@ BLUE = "\033[94m"
 GREEN = "\033[92m"
 YELLOW = "\033[93m"
 RED = "\033[91m"
+WHITE = "\033[97m"
 DIM = "\033[2m"
 BOLD = "\033[1m"
 RESET = "\033[0m"
@@ -61,6 +62,74 @@ def c(text: str, code: str) -> str:
     if not _supports_color():
         return text
     return f"{code}{text}{RESET}"
+
+
+# ── Animations ─────────────────────────────────────────────────────────────
+
+
+def clear_screen() -> None:
+    """Efface le terminal (seulement si TTY)."""
+    if _supports_color():
+        sys.stdout.write("\033[2J\033[H")
+        sys.stdout.flush()
+
+
+def type_print(text: str, prefix: str = "", delay: float = 0.025) -> None:
+    """Effet machine à écrire. Dégradé vers plain print si pas TTY."""
+    if not _supports_color():
+        print(prefix + text)
+        return
+    if prefix:
+        sys.stdout.write(prefix)
+        sys.stdout.flush()
+    for ch in text:
+        sys.stdout.write(ch)
+        sys.stdout.flush()
+        time.sleep(delay)
+    sys.stdout.write("\n")
+    sys.stdout.flush()
+
+
+def animate_separator(width: int = 44, color: str = "") -> None:
+    """Trace une ligne ─ caractère par caractère."""
+    col = color if color else DIM
+    if not _supports_color():
+        print(f"  {'─' * width}")
+        return
+    sys.stdout.write(f"  {col}")
+    for _ in range(width):
+        sys.stdout.write("─")
+        sys.stdout.flush()
+        time.sleep(0.007)
+    sys.stdout.write(f"{RESET}\n")
+    sys.stdout.flush()
+
+
+def success_flash(message: str) -> None:
+    """Affiche un message de succès avec un flash blanc → vert."""
+    if not _supports_color():
+        print(f"  ✓  {message}")
+        return
+    # Flash blanc vif d'abord
+    sys.stdout.write(f"  {BOLD}{WHITE}✓  {message}{RESET}\n")
+    sys.stdout.flush()
+    time.sleep(0.12)
+    # Remplacer par vert
+    sys.stdout.write(f"\033[1A\r  {BOLD}{GREEN}✓  {message}{RESET}\n")
+    sys.stdout.flush()
+
+
+def fade_out(message: str, color: str = "") -> None:
+    """Affiche un message qui s'estompe (bold → dim)."""
+    col = color if color else CYAN
+    if not _supports_color():
+        print(f"  {message}")
+        return
+    sys.stdout.write(f"  {BOLD}{col}{message}{RESET}\n")
+    sys.stdout.flush()
+    time.sleep(0.15)
+    sys.stdout.write(f"\033[1A\r  {DIM}{message}{RESET}\n")
+    sys.stdout.flush()
 
 
 # ── Spinner ────────────────────────────────────────────────────────────────
