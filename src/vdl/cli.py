@@ -83,7 +83,9 @@ def _list_sites() -> None:
         print("\n".join(names))
         print(f"\n{len(names)} extracteurs supportés")
     except ImportError:
-        print("yt-dlp non installe", file=sys.stderr)
+        from .i18n import t
+
+        print(t("missing_deps") + " yt-dlp", file=sys.stderr)
         sys.exit(1)
 
 
@@ -92,14 +94,17 @@ def _do_update() -> None:
     try:
         result = subprocess.run([pipx, "list"], capture_output=True, text=True)
         if "vdl" in result.stdout:
-            print("→ Mise à jour via pipx...")
+            from .i18n import t
+
+            print(f"→ {t('update_pipx')}")
             subprocess.run([pipx, "upgrade", "vdl"], check=True)
-            print("\nPour mettre a jour yt-dlp aussi :")
-            print("  pipx upgrade yt-dlp")
+            print(f"\n{t('update_yt_dlp')}")
             return
     except FileNotFoundError:
         pass
-    print("→ Mise à jour via pip...")
+    from .i18n import t
+
+    print(f"→ {t('update_pip')}")
     subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "vdl"], check=True)
 
 
@@ -121,78 +126,12 @@ def _read_batch_file(path: str) -> list[str]:
 
 
 def _run_search(query: str) -> None:
-    """Sous-commande : recherche interactive."""
-    from .search import SOURCES, _fmt_duration, _fmt_views, search_videos
-    from .tui import select as tui_select
-    from .tui import text as tui_text
-
-    source_choice = tui_select(
-        "Chercher sur ?",
-        choices=[
-            {"name": "YouTube", "value": "youtube"},
-            {"name": "SoundCloud", "value": "soundcloud"},
-        ],
-    )
-    if source_choice is None:
-        return
-
-    if not query:
-        q = tui_text("Rechercher :")
-        if not q or not q.strip():
-            return
-        query = q.strip()
-
-    source_name = next((k for k in SOURCES if k == source_choice), "youtube")
-    print(f"\nRecherche en cours sur {source_name.title()}...")
-
-    results = search_videos(query, source=source_name)
-    if not results:
-        print("Aucun resultat.", file=sys.stderr)
-        sys.exit(1)
-
-    def _label(r: dict[str, object]) -> str:
-        title = str(r.get("title", "?"))[:55]
-        dur = _fmt_duration(r.get("duration"))  # type: ignore[arg-type]
-        views = _fmt_views(r.get("view_count"))  # type: ignore[arg-type]
-        meta = "  ".join(filter(None, [dur, views]))
-        return f"{title}  [{meta}]" if meta else title
-
-    choices = [{"name": _label(r), "value": str(r["url"])} for r in results]
-    choices.append({"name": "← Annuler", "value": "__cancel__"})
-
-    url_choice = tui_select("Choisir un résultat :", choices=choices)
-    if url_choice is None or url_choice == "__cancel__":
-        return
-
-    from .config import load_config
-    from .downloader import Downloader, check_deps
+    """Sous-commande : recherche interactive (délègue à interactive._search_flow)."""
+    from .downloader import check_deps
+    from .interactive import _search_flow
 
     check_deps()
-    cfg = load_config()
-
-    from .tui import select as tui_sel
-
-    type_choice = tui_sel(
-        "Audio ou video ?",
-        choices=[
-            {"name": "Video MP4", "value": "video"},
-            {"name": "Audio MP3", "value": "audio"},
-        ],
-    )
-    is_audio = type_choice == "audio"
-    ext = "mp3" if is_audio else "mp4"
-    quality_selector = "bestaudio/best" if is_audio else "bestvideo+bestaudio/best"
-    audio_kbps = "320" if is_audio else "0"
-
-    dl = Downloader(
-        output_dir=cfg.output_dir,
-        sponsorblock=cfg.sponsorblock,
-        subs=cfg.subs,
-        subs_lang=cfg.subs_lang,
-        retries=cfg.retries,
-    )
-    rc = dl.download(url_choice, ext, is_audio, quality_selector, audio_kbps)
-    sys.exit(rc)
+    sys.exit(_search_flow())
 
 
 def main() -> None:

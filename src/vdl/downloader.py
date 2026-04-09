@@ -7,6 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from .i18n import t
 from .tui import BOLD, DIM, GREEN, RESET, YELLOW, Spinner, c
 
 logger = logging.getLogger(__name__)
@@ -23,7 +24,7 @@ def check_deps() -> None:
     if not shutil.which("ffmpeg"):
         missing.append("ffmpeg  →  brew install ffmpeg")
     if missing:
-        print("Dependances manquantes :", file=sys.stderr)
+        print(t("missing_deps"), file=sys.stderr)
         for m in missing:
             print(f"  {m}", file=sys.stderr)
         sys.exit(1)
@@ -142,7 +143,7 @@ class Downloader:
         for attempt in range(1, self.retries + 1):
             try:
                 logger.info("Recuperation des infos pour %s", url)
-                with Spinner("Recuperation des infos..."), yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                with Spinner(t("fetching")), yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=False)
                     title = info.get("title", "Video")
                     printer.title = title
@@ -152,7 +153,7 @@ class Downloader:
                     print()
                     ydl.download([url])
 
-                printer.done(c(f"Sauvegarde dans {self.output_dir}/", GREEN))
+                printer.done(c(t("saved", path=self.output_dir), GREEN))
                 from .history import log_download
 
                 log_download(url, title, ext, self.output_dir, "ok")
@@ -164,30 +165,29 @@ class Downloader:
                 if is_network and attempt < self.retries:
                     printer.done()
                     wait = 2**attempt
-                    print(c(f"Erreur reseau. Nouvel essai {attempt}/{self.retries - 1} dans {wait}s...", YELLOW))
+                    print(c(t("retry", attempt=attempt, max=self.retries - 1, wait=wait), YELLOW))
                     time.sleep(wait)
                     printer = ProgressPrinter()
                     continue
                 printer.done()
                 if "Unsupported URL" in msg:
-                    print(f"Site non supporte par yt-dlp : {url}", file=sys.stderr)
-                    print("  Lance `vdl --list-sites` pour voir les sites supportes.", file=sys.stderr)
+                    print(t("err_unsupported", url=url), file=sys.stderr)
+                    print(t("err_unsupported_hint"), file=sys.stderr)
                 elif "Private video" in msg:
-                    print("Video privee. Verifie l'URL ou tes permissions.", file=sys.stderr)
+                    print(t("err_private"), file=sys.stderr)
                 elif "Video unavailable" in msg:
-                    print("Video indisponible (supprimee ou restreinte geographiquement).", file=sys.stderr)
+                    print(t("err_unavailable"), file=sys.stderr)
                 elif "HTTP Error 429" in msg:
-                    print("Trop de requetes (429). Attends quelques minutes avant de reessayer.", file=sys.stderr)
+                    print(t("err_429"), file=sys.stderr)
                 elif "Unable to extract" in msg:
-                    print("Impossible d'extraire. Essaie : yt-dlp -U", file=sys.stderr)
+                    print(t("err_extract"), file=sys.stderr)
                 else:
-                    clean = msg.replace("ERROR: ", "").strip()
-                    print(clean, file=sys.stderr)
+                    print(msg.replace("ERROR: ", "").strip(), file=sys.stderr)
                 return 1
 
             except KeyboardInterrupt:
                 printer.done()
-                print("\nAnnule.")
+                print(f"\n{t('err_interrupted')}")
                 return 130
 
             except Exception as e:

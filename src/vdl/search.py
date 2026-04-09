@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import sys
 
+from .i18n import t
+
 
 def _fmt_duration(seconds: int | float | None) -> str:
     if not seconds:
@@ -17,11 +19,12 @@ def _fmt_duration(seconds: int | float | None) -> str:
 def _fmt_views(n: int | None) -> str:
     if not n:
         return ""
+    v = t("views")
     if n >= 1_000_000:
-        return f"{n / 1_000_000:.1f}M vues"
+        return f"{n / 1_000_000:.1f}M {v}"
     if n >= 1_000:
-        return f"{n // 1_000}K vues"
-    return f"{n} vues"
+        return f"{n // 1_000}K {v}"
+    return f"{n} {v}"
 
 
 SOURCES = {

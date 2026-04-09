@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .i18n import t
 from .tui import BOLD, CYAN, DIM, GREEN, RED, RESET
 
 _HISTORY_PATH = Path.home() / ".local" / "share" / "vdl" / "history.jsonl"
@@ -31,11 +32,11 @@ def log_download(
 
 def show_history(n: int = 20) -> None:
     if not _HISTORY_PATH.exists():
-        print("Aucun historique de telechargement.")
+        print(t("no_history"))
         return
     lines = _HISTORY_PATH.read_text(encoding="utf-8").splitlines()
     recent = lines[-n:]
-    print(f"{BOLD}Derniers {len(recent)} telechargements{RESET}\n")
+    print(f"{BOLD}{t('history_title', n=len(recent))}{RESET}\n")
     for line in reversed(recent):
         try:
             entry = json.loads(line)
