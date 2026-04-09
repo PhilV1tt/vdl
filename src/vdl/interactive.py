@@ -3,19 +3,31 @@
 from __future__ import annotations
 
 import sys
+import time
 
 from . import presets
 from .downloader import DEFAULT_OUTPUT, Downloader
-from .tui import confirm, select, text
+from .tui import BLUE, BOLD, CYAN, DIM, RESET, c, confirm, select, text
 
 # ── Bannière ───────────────────────────────────────────────────────────────
+
+_ASCII = [
+    r" ██╗   ██╗██████╗ ██╗     ",
+    r" ██║   ██║██╔══██╗██║     ",
+    r" ██║   ██║██║  ██║██║     ",
+    r" ╚██╗ ██╔╝██║  ██║██║     ",
+    r"  ╚████╔╝ ██████╔╝███████╗",
+    r"   ╚═══╝  ╚═════╝ ╚══════╝",
+]
 
 
 def _banner() -> None:
     print()
-    print("╔══════════════════════════════════════════╗")
-    print("║   vdl — Téléchargeur universel           ║")
-    print("╚══════════════════════════════════════════╝")
+    for i, line in enumerate(_ASCII):
+        color = CYAN if i < 3 else BLUE
+        print(f"{BOLD}{color}{line}{RESET}")
+        time.sleep(0.04)
+    print(f"  {DIM}Telechargeur universel de videos{RESET}")
     print()
 
 
@@ -110,7 +122,7 @@ def _download_flow(url: str) -> int:
     print()
 
     if not confirm("Confirmer le telechargement ?", default=True):
-        print("Annule.")
+        print(c("Annule.", DIM))
         return 0
 
     print()
@@ -142,7 +154,7 @@ def _search_flow() -> int:
         return 0
 
     source_name = next((k for k in SOURCES if k == source_choice), "youtube")
-    print(f"\nRecherche en cours sur {source_name.title()}...")
+    print(f"\n{c('Recherche en cours sur ' + source_name.title() + '...', CYAN)}")
 
     results = search_videos(query.strip(), source=source_name)
     if not results:

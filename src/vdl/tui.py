@@ -27,9 +27,47 @@ def enable_ansi_windows() -> None:
         pass
 
 
+# ── Couleurs ANSI ─────────────────────────────────────────────────────────
+
+CYAN = "\033[96m"
+BLUE = "\033[94m"
+GREEN = "\033[92m"
+YELLOW = "\033[93m"
+DIM = "\033[2m"
+BOLD = "\033[1m"
+RESET = "\033[0m"
+
+
+def _supports_color() -> bool:
+    return hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
+
+
+def c(text: str, code: str) -> str:
+    """Enveloppe text avec un code couleur ANSI si le terminal le supporte."""
+    if not _supports_color():
+        return text
+    return f"{code}{text}{RESET}"
+
+
 # ── Style questionary ──────────────────────────────────────────────────────
 
-_STYLE = None
+try:
+    from questionary import Style as _QStyle
+
+    _STYLE: _QStyle | None = _QStyle(
+        [
+            ("qmark", "fg:#5f87ff bold"),
+            ("question", "bold"),
+            ("answer", "fg:#5fffaf bold"),
+            ("pointer", "fg:#5f87ff bold"),
+            ("highlighted", "fg:#5f87ff bold"),
+            ("selected", "fg:#5fffaf"),
+            ("separator", "fg:#666666"),
+            ("instruction", "fg:#888888"),
+        ]
+    )
+except ImportError:
+    _STYLE = None
 
 
 # ── Wrappers publics ───────────────────────────────────────────────────────

@@ -7,6 +7,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from .tui import BOLD, DIM, GREEN, RESET, YELLOW, c
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_OUTPUT = str(Path.home() / "Downloads")
@@ -140,18 +142,18 @@ class Downloader:
         for attempt in range(1, self.retries + 1):
             try:
                 logger.info("Recuperation des infos pour %s", url)
-                print("Recuperation des infos...")
+                print(c("Recuperation des infos...", DIM))
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=False)
                     title = info.get("title", "Video")
                     printer.title = title
                     duration = int(info.get("duration") or 0)
                     dur_str = f"{duration // 60}:{duration % 60:02d}" if duration else ""
-                    print(f"{title}" + (f"  ({dur_str})" if dur_str else ""))
+                    print(f"{BOLD}{title}{RESET}" + (f"  {c(dur_str, DIM)}" if dur_str else ""))
                     print()
                     ydl.download([url])
 
-                printer.done(f"Sauvegarde dans {self.output_dir}/")
+                printer.done(c(f"Sauvegarde dans {self.output_dir}/", GREEN))
                 from .history import log_download
 
                 log_download(url, title, ext, self.output_dir, "ok")
@@ -163,7 +165,7 @@ class Downloader:
                 if is_network and attempt < self.retries:
                     printer.done()
                     wait = 2**attempt
-                    print(f"Erreur reseau. Nouvel essai {attempt}/{self.retries - 1} dans {wait}s...")
+                    print(c(f"Erreur reseau. Nouvel essai {attempt}/{self.retries - 1} dans {wait}s...", YELLOW))
                     time.sleep(wait)
                     printer = ProgressPrinter()
                     continue
