@@ -4,15 +4,44 @@ Fait avec amour pour Julien :))))
 
 Téléchargez des vidéos et de l'audio depuis YouTube, Vimeo, TikTok, SoundCloud et [1000+ autres sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md).
 
-## Installation (Mac)
+## Installation
 
-Collez cette commande dans le Terminal et appuiez sur Entrée :
+### macOS
+
+Collez cette commande dans le Terminal et appuyez sur Entrée :
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/PhilV1tt/vdl/main/install-mac.sh)
 ```
 
-C'est tout. Le script installe tout automatiquement.
+### Linux
+
+```bash
+# 1. Installer pipx si pas déjà installé
+sudo apt install pipx        # Debian/Ubuntu
+sudo dnf install pipx        # Fedora
+sudo pacman -S python-pipx   # Arch
+
+pipx ensurepath
+
+# 2. Installer ffmpeg
+sudo apt install ffmpeg      # Debian/Ubuntu
+sudo dnf install ffmpeg      # Fedora
+sudo pacman -S ffmpeg        # Arch
+
+# 3. Installer vdl
+pipx install git+https://github.com/PhilV1tt/vdl.git
+```
+
+### Windows
+
+Collez cette commande dans PowerShell (en tant qu'administrateur) :
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/PhilV1tt/vdl/main/install-windows.ps1 | iex"
+```
+
+Le script installe automatiquement Python, ffmpeg et vdl via winget.
 
 ## Utilisation
 
@@ -50,11 +79,11 @@ vdl https://soundcloud.com/a/b -a          # Audio depuis SoundCloud
 ## Mise à jour
 
 ```bash
-pipx upgrade vdl
+vdl --update
 ```
 
 ## Désinstallation
 
 ```bash
-pipx uninstall vdl
+pipx uninstall vdl        # macOS / Linux
 ```
