@@ -11,21 +11,31 @@ import time
 
 
 def enable_ansi_windows() -> None:
-    """Active les codes ANSI dans le terminal Windows (VTP)."""
+    """Active les codes ANSI et le copier-coller dans le terminal Windows."""
     if sys.platform != "win32":
         return
     try:
         import ctypes
         import ctypes.wintypes
 
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+
+        # Enable ANSI escape codes on stdout
         STD_OUTPUT_HANDLE = -11
         ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+        handle_out = kernel32.GetStdHandle(STD_OUTPUT_HANDLE)
+        mode_out = ctypes.wintypes.DWORD()
+        if kernel32.GetConsoleMode(handle_out, ctypes.byref(mode_out)):
+            kernel32.SetConsoleMode(handle_out, mode_out.value | ENABLE_VIRTUAL_TERMINAL_PROCESSING)
 
-        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
-        handle = kernel32.GetStdHandle(STD_OUTPUT_HANDLE)
-        mode = ctypes.wintypes.DWORD()
-        if kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
-            kernel32.SetConsoleMode(handle, mode.value | ENABLE_VIRTUAL_TERMINAL_PROCESSING)
+        # Enable QuickEdit mode on stdin so Ctrl+V / right-click paste works in cmd.exe
+        STD_INPUT_HANDLE = -10
+        ENABLE_QUICK_EDIT_MODE = 0x0040
+        ENABLE_EXTENDED_FLAGS = 0x0080
+        handle_in = kernel32.GetStdHandle(STD_INPUT_HANDLE)
+        mode_in = ctypes.wintypes.DWORD()
+        if kernel32.GetConsoleMode(handle_in, ctypes.byref(mode_in)):
+            kernel32.SetConsoleMode(handle_in, mode_in.value | ENABLE_EXTENDED_FLAGS | ENABLE_QUICK_EDIT_MODE)
     except Exception:
         pass
 

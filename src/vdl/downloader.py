@@ -68,6 +68,9 @@ class Downloader:
             "no_warnings": True,
         }
 
+        # WAV doesn't support embedded thumbnails
+        _THUMBNAIL_FORMATS = {"mp3", "m4a", "aac", "flac", "ogg", "opus"}
+
         if is_audio:
             opts["postprocessors"] = [
                 {
@@ -77,7 +80,7 @@ class Downloader:
                 },
                 {"key": "FFmpegMetadata"},
             ]
-            if self.embed_thumbnail:
+            if self.embed_thumbnail and ext in _THUMBNAIL_FORMATS:
                 opts["postprocessors"].append({"key": "EmbedThumbnail"})
                 opts["writethumbnail"] = True
         else:

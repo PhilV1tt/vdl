@@ -35,8 +35,12 @@ def load_config(path: Path = _CONFIG_PATH) -> VdlConfig:
         except ImportError:
             return VdlConfig()
 
-    with path.open("rb") as f:
-        raw = tomllib.load(f)
+    try:
+        with path.open("rb") as f:
+            raw = tomllib.load(f)
+    except Exception:
+        print(f"Warning: invalid config file {path}, using defaults.", file=sys.stderr)
+        return VdlConfig()
 
     cfg = VdlConfig()
     _apply(cfg, raw)

@@ -66,6 +66,7 @@ _S: dict[str, dict[str, str]] = {
         "err_unavailable": "Video indisponible (supprimee ou geo-restreinte).",
         "err_429": "Trop de requetes (429). Attends quelques minutes.",
         "err_extract": "Impossible d'extraire. Essaie : yt-dlp -U",
+        "converting": "Conversion en cours...",
         "err_interrupted": "Annule.",
         "missing_deps": "Dependances manquantes :",
         # History
@@ -129,6 +130,7 @@ _S: dict[str, dict[str, str]] = {
         "err_unavailable": "Video unavailable (deleted or geo-restricted).",
         "err_429": "Too many requests (429). Wait a few minutes.",
         "err_extract": "Cannot extract. Try: yt-dlp -U",
+        "converting": "Converting...",
         "err_interrupted": "Cancelled.",
         "missing_deps": "Missing dependencies:",
         # History

@@ -90,22 +90,28 @@ def _list_sites() -> None:
 
 
 def _do_update() -> None:
+    from .i18n import t
+
     pipx = "pipx"
     try:
         result = subprocess.run([pipx, "list"], capture_output=True, text=True)
         if "vdl" in result.stdout:
-            from .i18n import t
-
             print(f"→ {t('update_pipx')}")
-            subprocess.run([pipx, "upgrade", "vdl"], check=True)
+            try:
+                subprocess.run([pipx, "upgrade", "vdl"], check=True)
+            except subprocess.CalledProcessError as e:
+                print(f"Update failed: {e}", file=sys.stderr)
+                sys.exit(1)
             print(f"\n{t('update_yt_dlp')}")
             return
     except FileNotFoundError:
         pass
-    from .i18n import t
-
     print(f"→ {t('update_pip')}")
-    subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "vdl"], check=True)
+    try:
+        subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "vdl"], check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Update failed: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def _validate_url(url: str) -> str | None:

@@ -3,6 +3,8 @@ from __future__ import annotations
 import shutil
 import sys
 
+from .i18n import t
+
 _CYAN = "\033[96m"
 _GREEN = "\033[92m"
 _DIM = "\033[2m"
@@ -41,7 +43,7 @@ class ProgressPrinter:
 
     def converting(self) -> None:
         self._active = True
-        sys.stderr.write("\rConversion en cours...\033[K")
+        sys.stderr.write(f"\r{t('converting')}\033[K")
         sys.stderr.flush()
 
     def done(self, message: str = "") -> None:
