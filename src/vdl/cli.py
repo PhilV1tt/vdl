@@ -24,10 +24,11 @@ Exemples :
   vdl https://youtu.be/xxx --subs               vidéo + sous-titres embarqués
   vdl https://youtu.be/xxx --sponsorblock       supprimer les segments sponsors
   vdl -b liste.txt                              télécharger une liste d'URLs
-  vdl                                           mode interactif (prompts)
+  vdl search "lofi hip hop"                     rechercher sur YouTube
+  vdl                                           mode interactif (flèches)
 """,
     )
-    p.add_argument("url", nargs="?", help="URL de la vidéo/audio")
+    p.add_argument("url", nargs="?", help="URL de la vidéo/audio (ou 'search' pour rechercher)")
     p.add_argument("-a", "--audio", action="store_true", help="Extraire l'audio")
     p.add_argument("-v", "--video", action="store_true", help="Forcer le téléchargement vidéo")
     p.add_argument(
@@ -119,7 +120,101 @@ def _read_batch_file(path: str) -> list[str]:
     return [line.strip() for line in lines if line.strip() and not line.strip().startswith("#")]
 
 
+def _run_search(query: str) -> None:
+    """Sous-commande : recherche interactive."""
+    from .search import SOURCES, _fmt_duration, _fmt_views, search_videos
+    from .tui import select as tui_select
+    from .tui import text as tui_text
+
+    source_choice = tui_select(
+        "Chercher sur ?",
+        choices=[
+            {"name": "▶  YouTube", "value": "youtube"},
+            {"name": "☁  SoundCloud", "value": "soundcloud"},
+        ],
+        default="youtube",
+    )
+    if source_choice is None:
+        return
+
+    if not query:
+        q = tui_text("Rechercher :")
+        if not q or not q.strip():
+            return
+        query = q.strip()
+
+    source_name = next((k for k in SOURCES if k == source_choice), "youtube")
+    print(f"\n🔍 Recherche en cours sur {source_name.title()}...")
+
+    results = search_videos(query, source=source_name)
+    if not results:
+        print("❌  Aucun résultat.", file=sys.stderr)
+        sys.exit(1)
+
+    def _label(r: dict[str, object]) -> str:
+        title = str(r.get("title", "?"))[:55]
+        dur = _fmt_duration(r.get("duration"))  # type: ignore[arg-type]
+        views = _fmt_views(r.get("view_count"))  # type: ignore[arg-type]
+        meta = "  ".join(filter(None, [dur, views]))
+        return f"{title}  [{meta}]" if meta else title
+
+    choices = [{"name": _label(r), "value": str(r["url"])} for r in results]
+    choices.append({"name": "← Annuler", "value": "__cancel__"})
+
+    url_choice = tui_select("Choisir un résultat :", choices=choices)
+    if url_choice is None or url_choice == "__cancel__":
+        return
+
+    from .config import load_config
+    from .downloader import Downloader, check_deps
+
+    check_deps()
+    cfg = load_config()
+
+    from .tui import select as tui_sel
+
+    type_choice = tui_sel(
+        "Audio ou vidéo ?",
+        choices=[
+            {"name": "🎬 Vidéo MP4", "value": "video"},
+            {"name": "🎵 Audio MP3", "value": "audio"},
+        ],
+    )
+    is_audio = type_choice == "audio"
+    ext = "mp3" if is_audio else "mp4"
+    quality_selector = "bestaudio/best" if is_audio else "bestvideo+bestaudio/best"
+    audio_kbps = "320" if is_audio else "0"
+
+    dl = Downloader(
+        output_dir=cfg.output_dir,
+        sponsorblock=cfg.sponsorblock,
+        subs=cfg.subs,
+        subs_lang=cfg.subs_lang,
+        retries=cfg.retries,
+    )
+    rc = dl.download(url_choice, ext, is_audio, quality_selector, audio_kbps)
+    sys.exit(rc)
+
+
 def main() -> None:
+    # ── Init plateforme ────────────────────────────────────────────────────
+    from .tui import enable_ansi_windows
+
+    enable_ansi_windows()
+
+    # ── Sous-commande search ───────────────────────────────────────────────
+    # Géré avant argparse pour supporter : vdl search "query"
+    raw_args = sys.argv[1:]
+    if raw_args and raw_args[0] == "search":
+        query = " ".join(raw_args[1:])
+        _run_search(query)
+        return
+
+    # ── Détection mise à jour (background) ────────────────────────────────
+    from .updater import start_update_check
+
+    start_update_check(__version__)
+
     parser = _make_parser()
     args = parser.parse_args()
 
@@ -193,6 +288,9 @@ def main() -> None:
             else:
                 fail += 1
         print(f"\n✅  {ok} réussi(s)  ❌  {fail} échoué(s)")
+
+        # Notification mise à jour
+        _show_update_notification()
         sys.exit(0 if fail == 0 else 1)
 
     # ── Pas d'URL → mode interactif ────────────────────────────────────────
@@ -200,6 +298,7 @@ def main() -> None:
         from .interactive import run_interactive
 
         run_interactive()
+        _show_update_notification()
         return
 
     url = args.url.strip()
@@ -246,4 +345,16 @@ def main() -> None:
         output_template=args.output_template if args.output_template != "%(title)s.%(ext)s" else cfg.output_template,
         retries=cfg.retries,
     )
-    sys.exit(dl.download(url, ext, is_audio, quality_selector, audio_kbps))
+    rc = dl.download(url, ext, is_audio, quality_selector, audio_kbps)
+
+    # Notification mise à jour
+    _show_update_notification()
+    sys.exit(rc)
+
+
+def _show_update_notification() -> None:
+    from .updater import get_update_notification
+
+    msg = get_update_notification()
+    if msg:
+        print(f"\n{msg}")
