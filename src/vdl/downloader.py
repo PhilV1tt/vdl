@@ -4,6 +4,7 @@ import logging
 import shutil
 import sys
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,13 @@ from .i18n import t
 from .tui import BOLD, DIM, RESET, YELLOW, Spinner, c, success_flash
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class DownloadResult:
+    exit_code: int
+    file_path: Path | None = None
+    info: dict[str, Any] = field(default_factory=dict)
 
 DEFAULT_OUTPUT = str(Path.home() / "Downloads")
 
@@ -132,7 +140,7 @@ class Downloader:
         is_audio: bool,
         quality_selector: str,
         audio_kbps: str = "320",
-    ) -> int:
+    ) -> DownloadResult:
         import time
 
         import yt_dlp
@@ -166,8 +174,13 @@ class Downloader:
                 logger.info("Recuperation des infos pour %s", url)
                 with Spinner(t("fetching")), yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=False)
-                    title = info.get("title", "Video")
-                    printer.title = title
+                    if info is None:
+                        return DownloadResult(1)
+                    _path_info = dict(info)
+                    _path_info["ext"] = ext
+                    final_path = Path(ydl.prepare_filename(_path_info))
+                    title = info.get("title", "Video") or "Video"
+                    printer.title = str(title)
                     duration = int(info.get("duration") or 0)
                     dur_str = f"{duration // 60}:{duration % 60:02d}" if duration else ""
                     print(f"{BOLD}{title}{RESET}" + (f"  {c(dur_str, DIM)}" if dur_str else ""))
@@ -178,8 +191,8 @@ class Downloader:
                 success_flash(t("saved", path=self.output_dir))
                 from .history import log_download
 
-                log_download(url, title, ext, self.output_dir, "ok")
-                return 0
+                log_download(url, str(title), ext, self.output_dir, "ok")
+                return DownloadResult(0, final_path, info)
 
             except yt_dlp.utils.DownloadError as e:
                 msg = str(e)
@@ -193,16 +206,16 @@ class Downloader:
                     continue
                 printer.done()
                 _print_error(msg, url)
-                return 1
+                return DownloadResult(1)
 
             except KeyboardInterrupt:
                 printer.done()
                 print(f"\n{t('err_interrupted')}")
-                return 130
+                return DownloadResult(130)
 
             except Exception as e:
                 printer.done()
                 print(f"Erreur : {e}", file=sys.stderr)
-                return 1
+                return DownloadResult(1)
 
-        return 1
+        return DownloadResult(1)

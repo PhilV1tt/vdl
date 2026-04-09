@@ -16,6 +16,7 @@ class VdlConfig:
     subs_lang: str = "fr"
     output_template: str = "%(title)s.%(ext)s"
     retries: int = 3
+    music: bool = False
     _extra: dict[str, object] = field(default_factory=dict, repr=False)
 
 
@@ -31,6 +32,7 @@ _CONVERTERS: dict[str, object] = {
     "subs_lang": str,
     "output_template": str,
     "retries": lambda v: int(str(v)),
+    "music": bool,
 }
 
 

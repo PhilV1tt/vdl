@@ -68,6 +68,9 @@ Exemples :
         metavar="TEMPLATE",
         help="Template yt-dlp pour le nom de fichier (défaut: %%(title)s.%%(ext)s)",
     )
+    p.add_argument(
+        "-m", "--music", action="store_true", help="Télécharger en MP3 et importer dans Apple Music / iTunes"
+    )
     p.add_argument("--list-sites", action="store_true", help="Afficher les sites supportés par yt-dlp")
     p.add_argument("--history", action="store_true", help="Afficher l'historique des téléchargements")
     p.add_argument("--update", action="store_true", help="Mettre à jour vdl")
@@ -203,8 +206,8 @@ def main() -> None:
                 print(f"URL ignoree ({err}) : {url}", file=sys.stderr)
                 fail += 1
                 continue
-            rc = dl.download(url, ext, is_audio, quality_selector, audio_kbps)  # type: ignore[union-attr]
-            if rc == 0:
+            result = dl.download(url, ext, is_audio, quality_selector, audio_kbps)  # type: ignore[union-attr]
+            if result.exit_code == 0:
                 ok += 1
             else:
                 fail += 1
@@ -226,8 +229,8 @@ def main() -> None:
         print(err, file=sys.stderr)
         sys.exit(1)
 
-    # Déterminer si c'est de l'audio
-    is_audio = args.audio
+    # Déterminer si c'est de l'audio (--music implique --audio)
+    is_audio = args.audio or args.music
     if not is_audio and not args.video and args.format and args.format.lower() in presets.AUDIO_EXTS:
         is_audio = True
 
@@ -242,10 +245,15 @@ def main() -> None:
 
     quality_selector, audio_kbps = presets.build_quality_selector(is_audio, args.quality)
     dl = _build_downloader(args, cfg)
-    rc = dl.download(url, ext, is_audio, quality_selector, audio_kbps)  # type: ignore[union-attr]
+    result = dl.download(url, ext, is_audio, quality_selector, audio_kbps)  # type: ignore[union-attr]
+
+    if args.music and result.exit_code == 0 and result.file_path:
+        from .music import music_pipeline
+
+        music_pipeline(result.file_path, result.info)
 
     _show_update_notification()
-    sys.exit(rc)
+    sys.exit(result.exit_code)
 
 
 def _show_update_notification() -> None:

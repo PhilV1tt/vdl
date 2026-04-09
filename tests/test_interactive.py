@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
+from vdl.downloader import DownloadResult
 from vdl.interactive import _download_flow, run_interactive
 
 
@@ -15,7 +16,7 @@ class TestDownloadFlow:
             patch("vdl.interactive.select", return_value="audio"),
             patch("vdl.interactive.Downloader") as mock_dl,
         ):
-            mock_dl.return_value.download.return_value = 0
+            mock_dl.return_value.download.return_value = DownloadResult(0)
             rc = _download_flow("https://example.com/audio")
         assert rc == 0
         call_args = mock_dl.return_value.download.call_args[0]
@@ -27,7 +28,7 @@ class TestDownloadFlow:
             patch("vdl.interactive.select", return_value="video"),
             patch("vdl.interactive.Downloader") as mock_dl,
         ):
-            mock_dl.return_value.download.return_value = 0
+            mock_dl.return_value.download.return_value = DownloadResult(0)
             rc = _download_flow("https://example.com/video")
         assert rc == 0
         call_args = mock_dl.return_value.download.call_args[0]
@@ -44,9 +45,22 @@ class TestDownloadFlow:
             patch("vdl.interactive.select", return_value="video"),
             patch("vdl.interactive.Downloader") as mock_dl,
         ):
-            mock_dl.return_value.download.return_value = 1
+            mock_dl.return_value.download.return_value = DownloadResult(1)
             rc = _download_flow("https://example.com/video")
         assert rc == 1
+
+    def test_music_choice_calls_pipeline(self, tmp_path):
+        f = tmp_path / "song.mp3"
+        f.write_bytes(b"")
+        with (
+            patch("vdl.interactive.select", return_value="music"),
+            patch("vdl.interactive.Downloader") as mock_dl,
+            patch("vdl.music.music_pipeline") as mock_pipeline,
+        ):
+            mock_dl.return_value.download.return_value = DownloadResult(0, f, {"title": "Song"})
+            rc = _download_flow("https://example.com/song")
+        assert rc == 0
+        mock_pipeline.assert_called_once()
 
 
 class TestRunInteractive:
@@ -96,7 +110,7 @@ class TestRunInteractive:
             patch("vdl.interactive.Downloader") as mock_dl,
             pytest.raises(SystemExit) as exc,
         ):
-            mock_dl.return_value.download.return_value = 0
+            mock_dl.return_value.download.return_value = DownloadResult(0)
             run_interactive()
         assert exc.value.code == 0
 

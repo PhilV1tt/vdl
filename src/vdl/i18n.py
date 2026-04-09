@@ -81,6 +81,17 @@ _S: dict[str, dict[str, str]] = {
         "update_now": "Mettre a jour maintenant ?",
         # Search views
         "views": "vues",
+        # Music pipeline
+        "opt_music": "Apple Music",
+        "music_lookup": "Recherche sur MusicBrainz...",
+        "music_lookup_found": "Metadonnees : {info}",
+        "music_lookup_none": "Aucune metadonnee trouvee.",
+        "music_tagged": "Tags ecrits.",
+        "music_importing": "Import dans Apple Music...",
+        "music_imported": "Importe dans Apple Music !",
+        "music_import_error": "Erreur lors de l'import dans Apple Music.",
+        "music_skip_import": "Import Apple Music/iTunes non disponible sur cette plateforme.",
+        "music_missing_deps": "Dependances manquantes pour --music :",
     },
     "en": {
         # Banner
@@ -147,6 +158,17 @@ _S: dict[str, dict[str, str]] = {
         "update_now": "Update now?",
         # Search views
         "views": "views",
+        # Music pipeline
+        "opt_music": "Apple Music",
+        "music_lookup": "Looking up on MusicBrainz...",
+        "music_lookup_found": "Metadata: {info}",
+        "music_lookup_none": "No metadata found.",
+        "music_tagged": "Tags written.",
+        "music_importing": "Importing into Apple Music...",
+        "music_imported": "Imported into Apple Music!",
+        "music_import_error": "Error importing into Apple Music.",
+        "music_skip_import": "Apple Music/iTunes import not available on this platform.",
+        "music_missing_deps": "Missing dependencies for --music:",
     },
 }
 

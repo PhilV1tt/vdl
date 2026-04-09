@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vdl"
-version = "0.4.0"
+version = "0.5.0"
 description = "Téléchargeur universel de vidéos — CLI multi-sites basé sur yt-dlp"
 requires-python = ">=3.9"
 dependencies = [
@@ -16,6 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.4", "mypy>=1.0"]
+music = ["mutagen>=1.45", "musicbrainzngs>=0.7"]
 
 [project.scripts]
 vdl = "vdl.cli:main"

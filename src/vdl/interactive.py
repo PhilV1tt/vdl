@@ -71,18 +71,20 @@ def _banner() -> None:
 
 
 def _download_flow(url: str) -> int:
-    """Demande juste Audio ou Vidéo, puis télécharge avec les meilleurs réglages."""
+    """Demande Audio / Vidéo / Apple Music, puis télécharge."""
     type_choice = select(
         t("audio_or_video"),
         choices=[
             {"name": t("opt_video") + "  (MP4)", "value": "video"},
             {"name": t("opt_audio") + "  (MP3)", "value": "audio"},
+            {"name": t("opt_music") + "  (MP3 → Apple Music)", "value": "music"},
         ],
     )
     if type_choice is None:
         return 0
 
-    is_audio = type_choice == "audio"
+    do_music = type_choice == "music"
+    is_audio = type_choice in ("audio", "music")
     ext = "mp3" if is_audio else "mp4"
     from . import presets
 
@@ -90,7 +92,14 @@ def _download_flow(url: str) -> int:
 
     print()
     dl = Downloader(output_dir=DEFAULT_OUTPUT)
-    return dl.download(url, ext, is_audio, quality_selector, audio_kbps)
+    result = dl.download(url, ext, is_audio, quality_selector, audio_kbps)
+
+    if do_music and result.exit_code == 0 and result.file_path:
+        from .music import music_pipeline
+
+        music_pipeline(result.file_path, result.info)
+
+    return result.exit_code
 
 
 def _search_flow() -> int:
