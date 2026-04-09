@@ -3,32 +3,18 @@
 from __future__ import annotations
 
 import sys
-import time
 
-from . import __version__, presets
+from . import __version__
 from .downloader import DEFAULT_OUTPUT, Downloader
 from .i18n import t
-from .tui import BLUE, BOLD, CYAN, DIM, GREEN, RESET, Spinner, c, confirm, select, text
+from .tui import BOLD, CYAN, DIM, RESET, Spinner, select, text
 
 # ── Bannière ───────────────────────────────────────────────────────────────
-
-_ASCII = [
-    r" ██╗   ██╗██████╗ ██╗     ",
-    r" ██║   ██║██╔══██╗██║     ",
-    r" ██║   ██║██║  ██║██║     ",
-    r" ╚██╗ ██╔╝██║  ██║██║     ",
-    r"  ╚████╔╝ ██████╔╝███████╗",
-    r"   ╚═══╝  ╚═════╝ ╚══════╝",
-]
 
 
 def _banner() -> None:
     print()
-    for i, line in enumerate(_ASCII):
-        color = CYAN if i < 3 else BLUE
-        print(f"{BOLD}{color}{line}{RESET}")
-        time.sleep(0.04)
-    print(f"  {DIM}{t('banner_sub')}  {RESET}{CYAN}v{__version__}{RESET}")
+    print(f"  {BOLD}{CYAN}VDL{RESET}  {DIM}{t('banner_sub')}{RESET}  {CYAN}v{__version__}{RESET}")
     print()
 
 
@@ -36,105 +22,24 @@ def _banner() -> None:
 
 
 def _download_flow(url: str) -> int:
-    """Collecte les options et lance le téléchargement."""
-    # Type
+    """Demande juste Audio ou Vidéo, puis télécharge avec les meilleurs réglages."""
     type_choice = select(
         t("audio_or_video"),
         choices=[
-            {"name": t("opt_video"), "value": "video"},
-            {"name": t("opt_audio"), "value": "audio"},
+            {"name": t("opt_video") + "  (MP4)", "value": "video"},
+            {"name": t("opt_audio") + "  (MP3)", "value": "audio"},
         ],
     )
     if type_choice is None:
         return 0
+
     is_audio = type_choice == "audio"
-
-    if is_audio:
-        fmt_choice = select(
-            t("audio_format"),
-            choices=[{"name": f["label"], "value": f["ext"]} for f in presets.AUDIO_FORMATS],
-        )
-        if fmt_choice is None:
-            return 0
-        ext: str = fmt_choice
-
-        q_choice = select(
-            t("audio_quality"),
-            choices=[{"name": q["label"], "value": q["value"]} for q in presets.AUDIO_QUALITIES],
-        )
-        if q_choice is None:
-            return 0
-        audio_kbps: str = q_choice
-        quality_selector = "bestaudio/best"
-    else:
-        fmt_choice = select(
-            t("video_format"),
-            choices=[{"name": f["label"], "value": f["ext"]} for f in presets.VIDEO_FORMATS],
-        )
-        if fmt_choice is None:
-            return 0
-        ext = fmt_choice
-
-        q_choice = select(
-            t("video_quality"),
-            choices=[{"name": q["label"], "value": q["value"]} for q in presets.VIDEO_QUALITIES],
-        )
-        if q_choice is None:
-            return 0
-        quality_selector = q_choice
-        audio_kbps = "0"
-
-    # Sous-titres (vidéo uniquement)
-    subs = False
-    subs_lang = "fr"
-    if not is_audio:
-        subs = confirm(t("subs_prompt"), default=False)
-        if subs:
-            lang = text(t("subs_lang_prompt"), default="fr")
-            subs_lang = lang if lang else "fr"
-
-    # SponsorBlock
-    sponsorblock = False
-    if not is_audio:
-        sponsorblock = confirm(t("sponsorblock_prompt"), default=False)
-
-    # Dossier de sortie
-    output_raw = text(t("output_dir_prompt"), default=DEFAULT_OUTPUT)
-    output = output_raw if output_raw else DEFAULT_OUTPUT
-
-    # Récapitulatif
-    _B = f"{CYAN}│{RESET}"
-    print()
-    print(f"  {CYAN}┌─ {t('summary_title')} {'─' * (39 - len(t('summary_title')))}┐{RESET}")
-    url_short = (url[:48] + "…") if len(url) > 50 else url
-    print(f"  {_B}  {t('lbl_url'):<8}: {DIM}{url_short}{RESET}")
-    type_label = c(t("opt_audio"), GREEN) if is_audio else c(t("opt_video"), BLUE)
-    print(f"  {_B}  {t('lbl_type'):<8}: {type_label} {BOLD}{ext.upper()}{RESET}")
-    if not is_audio:
-        q_label = next(
-            (q["label"] for q in presets.VIDEO_QUALITIES if q["value"] == quality_selector),
-            quality_selector,
-        )
-        print(f"  {_B}  {t('lbl_quality'):<8}: {q_label}")
-    if subs:
-        print(f"  {_B}  {t('lbl_subs'):<8}: {c(subs_lang, CYAN)}")
-    if sponsorblock:
-        print(f"  {_B}  {t('lbl_sponsorblock')}: {c(t('sb_active'), GREEN)}")
-    print(f"  {_B}  {t('lbl_output'):<8}: {DIM}{output}{RESET}")
-    print(f"  {CYAN}└──────────────────────────────────────────┘{RESET}")
-    print()
-
-    if not confirm(t("confirm_dl"), default=True):
-        print(c(t("cancelled"), DIM))
-        return 0
+    ext = "mp3" if is_audio else "mp4"
+    quality_selector = "bestaudio/best" if is_audio else "bestvideo+bestaudio/best"
+    audio_kbps = "320" if is_audio else "0"
 
     print()
-    dl = Downloader(
-        output_dir=output,
-        subs=subs,
-        subs_lang=subs_lang,
-        sponsorblock=sponsorblock,
-    )
+    dl = Downloader(output_dir=DEFAULT_OUTPUT)
     return dl.download(url, ext, is_audio, quality_selector, audio_kbps)
 
 
@@ -162,7 +67,7 @@ def _search_flow() -> int:
         results = search_videos(query.strip(), source=source_name)
     if not results:
         print(t("no_results"), file=sys.stderr)
-        return 1
+        return 0
 
     from .search import _fmt_duration, _fmt_views
 
@@ -171,7 +76,7 @@ def _search_flow() -> int:
         dur = _fmt_duration(r.get("duration"))  # type: ignore[arg-type]
         views = _fmt_views(r.get("view_count"))  # type: ignore[arg-type]
         meta = "  ".join(filter(None, [dur, views]))
-        return f"{title}  [{meta}]" if meta else title
+        return f"{title}  {DIM}[{meta}]{RESET}" if meta else title
 
     choices = [{"name": _label(r), "value": str(r["url"])} for r in results]
     choices.append({"name": f"← {t('opt_back')}", "value": "__back__"})
@@ -183,12 +88,11 @@ def _search_flow() -> int:
     return _download_flow(url_choice)
 
 
-def _history_flow() -> int:
+def _history_flow() -> None:
     """Affiche l'historique."""
     from .history import show_history
 
     show_history()
-    return 0
 
 
 # ── Point d'entrée principal ───────────────────────────────────────────────
@@ -199,7 +103,7 @@ def run_interactive() -> None:
 
     while True:
         action = select(
-            "?",
+            t("menu_prompt"),
             choices=[
                 {"name": t("menu_download"), "value": "download"},
                 {"name": t("menu_search"), "value": "search"},
@@ -220,14 +124,12 @@ def run_interactive() -> None:
             if not url.startswith(("http://", "https://")):
                 print(t("err_bad_url"), file=sys.stderr)
                 continue
-            rc = _download_flow(url)
-            sys.exit(rc)
+            _download_flow(url)
+            print()
 
         elif action == "search":
-            rc = _search_flow()
-            if rc != 0:
-                sys.exit(rc)
-            # Retour au menu après search
+            _search_flow()
+            print()
 
         elif action == "history":
             _history_flow()

@@ -20,6 +20,7 @@ _S: dict[str, dict[str, str]] = {
         # Banner
         "banner_sub": "Telechargeur universel de videos",
         # Menu principal
+        "menu_prompt": "Que veux-tu faire ?",
         "menu_download": "Telecharger depuis une URL",
         "menu_search": "Rechercher sur YouTube / SoundCloud",
         "menu_history": "Historique",
@@ -84,6 +85,7 @@ _S: dict[str, dict[str, str]] = {
         # Banner
         "banner_sub": "Universal video downloader",
         # Main menu
+        "menu_prompt": "What do you want to do?",
         "menu_download": "Download from a URL",
         "menu_search": "Search on YouTube / SoundCloud",
         "menu_history": "History",
