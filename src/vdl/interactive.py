@@ -1,14 +1,43 @@
+from __future__ import annotations
+
 import sys
 
 from . import presets
 from .downloader import DEFAULT_OUTPUT, Downloader
 
+# ── Couleurs ANSI (désactivées si non-TTY) ─────────────────────────────────
 
-def _pick(items: list, label_key: str, default: int = 1) -> int:
+
+def _c(text: str, code: str) -> str:
+    if not sys.stdout.isatty():
+        return text
+    return f"\033[{code}m{text}\033[0m"
+
+
+def _bold(text: str) -> str:
+    return _c(text, "1")
+
+
+def _cyan(text: str) -> str:
+    return _c(text, "96")
+
+
+def _green(text: str) -> str:
+    return _c(text, "92")
+
+
+def _yellow(text: str) -> str:
+    return _c(text, "93")
+
+
+# ── Helpers interactifs ────────────────────────────────────────────────────
+
+
+def _pick(items: list[dict[str, str]], label_key: str, default: int = 1) -> int:
     for i, item in enumerate(items, 1):
-        marker = " ←" if i == default else ""
+        marker = _cyan(" ←") if i == default else ""
         print(f"  {i}. {item[label_key]}{marker}")
-    raw = input(f"→ Choix [{default}] : ").strip()
+    raw = input(_bold(f"→ Choix [{default}] : ")).strip()
     if not raw:
         return default - 1
     try:
@@ -20,16 +49,19 @@ def _pick(items: list, label_key: str, default: int = 1) -> int:
     return default - 1
 
 
-def run_interactive():
+# ── Mode interactif principal ──────────────────────────────────────────────
+
+
+def run_interactive() -> None:
     print()
-    print("╔══════════════════════════════════════════╗")
-    print("║   vdl — Téléchargeur universel           ║")
-    print("╚══════════════════════════════════════════╝")
+    print(_cyan("╔══════════════════════════════════════════╗"))
+    print(_cyan("║") + _bold("   vdl — Téléchargeur universel           ") + _cyan("║"))
+    print(_cyan("╚══════════════════════════════════════════╝"))
     print()
 
     # URL
     try:
-        url = input("🔗 Lien de la vidéo : ").strip()
+        url = input(_bold("🔗 Lien de la vidéo : ")).strip()
     except (EOFError, KeyboardInterrupt):
         print()
         sys.exit(0)
@@ -44,7 +76,7 @@ def run_interactive():
     # Type audio ou vidéo
     print()
     try:
-        typ = input("🎬 Audio ou vidéo ? [a/v] (défaut: v) : ").strip().lower()
+        typ = input(_bold("🎬 Audio ou vidéo ? [a/v] (défaut: v) : ")).strip().lower()
     except (EOFError, KeyboardInterrupt):
         print()
         sys.exit(0)
@@ -69,15 +101,56 @@ def run_interactive():
         quality_selector = presets.VIDEO_QUALITIES[q_idx]["value"]
         audio_kbps = "0"
 
+    # Sous-titres (vidéo uniquement)
+    subs = False
+    subs_lang = "fr"
+    if not is_audio:
+        print()
+        try:
+            subs_ans = input(_bold("💬 Télécharger les sous-titres ? [o/N] : ")).strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            sys.exit(0)
+        if subs_ans == "o":
+            subs = True
+            try:
+                lang_ans = input(_bold("   Langue des sous-titres [fr] : ")).strip()
+            except (EOFError, KeyboardInterrupt):
+                print()
+                sys.exit(0)
+            subs_lang = lang_ans or "fr"
+
     # Dossier de sortie
     print()
     try:
-        out_input = input(f"📂 Dossier de sortie [{DEFAULT_OUTPUT}] : ").strip()
+        out_input = input(_bold(f"📂 Dossier de sortie [{DEFAULT_OUTPUT}] : ")).strip()
     except (EOFError, KeyboardInterrupt):
         print()
         sys.exit(0)
     output = out_input or DEFAULT_OUTPUT
 
+    # Résumé + confirmation
     print()
-    dl = Downloader(output_dir=output)
+    print(_bold("  Récapitulatif :"))
+    print(f"    URL     : {url}")
+    print(f"    Type    : {'audio' if is_audio else 'vidéo'}")
+    print(f"    Format  : {ext.upper()}")
+    if not is_audio:
+        quality_label = presets.VIDEO_QUALITIES[q_idx]["label"]
+        print(f"    Qualité : {quality_label}")
+    if subs:
+        print(f"    Subs    : {subs_lang}")
+    print(f"    Sortie  : {output}")
+    print()
+    try:
+        confirm = input(_bold("Confirmer ? [O/n] : ")).strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        sys.exit(0)
+    if confirm == "n":
+        print("🛑  Annulé.")
+        sys.exit(0)
+
+    print()
+    dl = Downloader(output_dir=output, subs=subs, subs_lang=subs_lang)
     sys.exit(dl.download(url, ext, is_audio, quality_selector, audio_kbps))

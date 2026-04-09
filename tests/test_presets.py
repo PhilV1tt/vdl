@@ -43,9 +43,9 @@ def test_video_formats_have_ext_and_label():
 
 def test_audio_exts_match_audio_formats():
     expected = {f["ext"] for f in presets.AUDIO_FORMATS}
-    assert presets.AUDIO_EXTS == expected
+    assert expected == presets.AUDIO_EXTS
 
 
 def test_video_exts_match_video_formats():
     expected = {f["ext"] for f in presets.VIDEO_FORMATS}
-    assert presets.VIDEO_EXTS == expected
+    assert expected == presets.VIDEO_EXTS

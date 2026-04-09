@@ -4,13 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vdl"
-version = "0.1.0"
+version = "0.2.0"
 description = "Téléchargeur universel de vidéos — CLI multi-sites basé sur yt-dlp"
 requires-python = ">=3.9"
-dependencies = ["yt-dlp>=2024.01.01"]
+dependencies = [
+    "yt-dlp>=2024.01.01",
+    "tomli>=1.1; python_version < '3.11'",
+]
 
 [project.optional-dependencies]
-dev = ["pytest>=7", "ruff>=0.4"]
+dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.4", "mypy>=1.0"]
 
 [project.scripts]
 vdl = "vdl.cli:main"
@@ -23,7 +26,15 @@ target-version = "py39"
 line-length = 120
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP"]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "PTH", "RUF", "C4", "PIE"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--cov=vdl --cov-report=term-missing"

@@ -71,3 +71,42 @@ class TestBuildYdlOpts:
         opts = dl._build_ydl_opts("mp4", False, "bestvideo+bestaudio/best", "0", _dummy_hook)
         assert opts["quiet"] is True
         assert opts["no_warnings"] is True
+
+    def test_custom_output_template(self):
+        dl = make_dl(output_template="%(uploader)s - %(title)s.%(ext)s")
+        opts = dl._build_ydl_opts("mp4", False, "bestvideo+bestaudio/best", "0", _dummy_hook)
+        assert "%(uploader)s" in opts["outtmpl"]
+
+    def test_sponsorblock_adds_postprocessors(self):
+        dl = make_dl(sponsorblock=True)
+        opts = dl._build_ydl_opts("mp4", False, "bestvideo+bestaudio/best", "0", _dummy_hook)
+        keys = [p["key"] for p in opts.get("postprocessors", [])]
+        assert "SponsorBlock" in keys
+        assert "ModifyChapters" in keys
+
+    def test_sponsorblock_off_by_default(self):
+        dl = make_dl()
+        opts = dl._build_ydl_opts("mp4", False, "bestvideo+bestaudio/best", "0", _dummy_hook)
+        keys = [p["key"] for p in opts.get("postprocessors", [])]
+        assert "SponsorBlock" not in keys
+
+    def test_subs_adds_options(self):
+        dl = make_dl(subs=True, subs_lang="en")
+        opts = dl._build_ydl_opts("mp4", False, "bestvideo+bestaudio/best", "0", _dummy_hook)
+        assert opts.get("writesubtitles") is True
+        assert "en" in opts.get("subtitleslangs", [])
+        keys = [p["key"] for p in opts.get("postprocessors", [])]
+        assert "FFmpegEmbedSubtitle" in keys
+
+    def test_subs_off_by_default(self):
+        dl = make_dl()
+        opts = dl._build_ydl_opts("mp4", False, "bestvideo+bestaudio/best", "0", _dummy_hook)
+        assert "writesubtitles" not in opts
+
+    def test_retries_default(self):
+        dl = make_dl()
+        assert dl.retries == 3
+
+    def test_custom_retries(self):
+        dl = make_dl(retries=5)
+        assert dl.retries == 5
