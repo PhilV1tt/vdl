@@ -5,9 +5,9 @@ from __future__ import annotations
 import sys
 import time
 
-from . import presets
+from . import __version__, presets
 from .downloader import DEFAULT_OUTPUT, Downloader
-from .tui import BLUE, BOLD, CYAN, DIM, RESET, c, confirm, select, text
+from .tui import BLUE, BOLD, CYAN, DIM, GREEN, RESET, Spinner, c, confirm, select, text
 
 # ── Bannière ───────────────────────────────────────────────────────────────
 
@@ -27,7 +27,7 @@ def _banner() -> None:
         color = CYAN if i < 3 else BLUE
         print(f"{BOLD}{color}{line}{RESET}")
         time.sleep(0.04)
-    print(f"  {DIM}Telechargeur universel de videos{RESET}")
+    print(f"  {DIM}Telechargeur universel de videos  {RESET}{CYAN}v{__version__}{RESET}")
     print()
 
 
@@ -102,23 +102,25 @@ def _download_flow(url: str) -> int:
     output = output_raw if output_raw else DEFAULT_OUTPUT
 
     # Récapitulatif
+    _B = f"{CYAN}│{RESET}"
     print()
-    print("  ┌─ Récapitulatif ──────────────────────────┐")
+    print(f"  {CYAN}┌─ Recapitulatif ──────────────────────────┐{RESET}")
     url_short = (url[:48] + "…") if len(url) > 50 else url
-    print(f"  │  URL     : {url_short}")
-    print(f"  │  Type    : {'audio' if is_audio else 'vidéo'} {ext.upper()}")
+    print(f"  {_B}  URL     : {DIM}{url_short}{RESET}")
+    type_label = c("audio", GREEN) if is_audio else c("video", BLUE)
+    print(f"  {_B}  Type    : {type_label} {BOLD}{ext.upper()}{RESET}")
     if not is_audio:
         q_label = next(
             (q["label"] for q in presets.VIDEO_QUALITIES if q["value"] == quality_selector),
             quality_selector,
         )
-        print(f"  │  Qualité : {q_label}")
+        print(f"  {_B}  Qualite : {q_label}")
     if subs:
-        print(f"  │  Subs    : {subs_lang}")
+        print(f"  {_B}  Subs    : {c(subs_lang, CYAN)}")
     if sponsorblock:
-        print("  │  SponsorBlock : activé")
-    print(f"  │  Sortie  : {output}")
-    print("  └──────────────────────────────────────────┘")
+        print(f"  {_B}  SponsorBlock : {c('actif', GREEN)}")
+    print(f"  {_B}  Sortie  : {DIM}{output}{RESET}")
+    print(f"  {CYAN}└──────────────────────────────────────────┘{RESET}")
     print()
 
     if not confirm("Confirmer le telechargement ?", default=True):
@@ -154,9 +156,9 @@ def _search_flow() -> int:
         return 0
 
     source_name = next((k for k in SOURCES if k == source_choice), "youtube")
-    print(f"\n{c('Recherche en cours sur ' + source_name.title() + '...', CYAN)}")
-
-    results = search_videos(query.strip(), source=source_name)
+    print()
+    with Spinner(f"Recherche sur {source_name.title()}..."):
+        results = search_videos(query.strip(), source=source_name)
     if not results:
         print("Aucun resultat.", file=sys.stderr)
         return 1

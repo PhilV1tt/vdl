@@ -7,7 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from .tui import BOLD, DIM, GREEN, RESET, YELLOW, c
+from .tui import BOLD, DIM, GREEN, RESET, YELLOW, Spinner, c
 
 logger = logging.getLogger(__name__)
 
@@ -142,8 +142,7 @@ class Downloader:
         for attempt in range(1, self.retries + 1):
             try:
                 logger.info("Recuperation des infos pour %s", url)
-                print(c("Recuperation des infos...", DIM))
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                with Spinner("Recuperation des infos..."), yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=False)
                     title = info.get("title", "Video")
                     printer.title = title

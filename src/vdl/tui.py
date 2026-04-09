@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import itertools
 import sys
+import threading
+import time
 
 # ── Support ANSI Windows ───────────────────────────────────────────────────
 
@@ -33,6 +36,7 @@ CYAN = "\033[96m"
 BLUE = "\033[94m"
 GREEN = "\033[92m"
 YELLOW = "\033[93m"
+RED = "\033[91m"
 DIM = "\033[2m"
 BOLD = "\033[1m"
 RESET = "\033[0m"
@@ -47,6 +51,38 @@ def c(text: str, code: str) -> str:
     if not _supports_color():
         return text
     return f"{code}{text}{RESET}"
+
+
+# ── Spinner ────────────────────────────────────────────────────────────────
+
+_SPIN_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
+
+class Spinner:
+    """Spinner animé à utiliser comme context manager."""
+
+    def __init__(self, message: str) -> None:
+        self._message = message
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._spin, daemon=True)
+
+    def _spin(self) -> None:
+        for frame in itertools.cycle(_SPIN_FRAMES):
+            if self._stop.is_set():
+                break
+            sys.stderr.write(f"\r{CYAN}{frame}{RESET} {self._message}")
+            sys.stderr.flush()
+            time.sleep(0.08)
+        sys.stderr.write("\r\033[K")
+        sys.stderr.flush()
+
+    def __enter__(self) -> Spinner:
+        self._thread.start()
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self._stop.set()
+        self._thread.join(timeout=1)
 
 
 # ── Style questionary ──────────────────────────────────────────────────────
