@@ -31,7 +31,6 @@ def _download_flow(url: str) -> int:
             {"name": "🎬 Vidéo", "value": "video"},
             {"name": "🎵 Audio", "value": "audio"},
         ],
-        default="video",
     )
     if type_choice is None:
         return 0
