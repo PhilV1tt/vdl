@@ -97,5 +97,5 @@ def get_update_notification() -> str | None:
     if _check_thread is not None:
         _check_thread.join(timeout=0.5)
     if _latest_version:
-        return f"💡 Nouvelle version disponible : v{_latest_version}  →  vdl --update"
+        return f"Nouvelle version disponible : v{_latest_version}  (vdl --update)"
     return None

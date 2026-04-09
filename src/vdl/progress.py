@@ -24,13 +24,13 @@ class ProgressPrinter:
         eta_str = f"  ETA {int(eta_sec) // 60:02d}:{int(eta_sec) % 60:02d}" if eta_sec else ""
         size_str = f"  {self.total_bytes / 1024 / 1024:.1f} MiB" if self.total_bytes else ""
         title = (self.title[:34] + "…") if len(self.title) > 35 else self.title
-        line = f"\r⬇  {title}  [{bar}] {pct:5.1f}%{size_str}{speed_str}{eta_str}"
+        line = f"\r{title}  [{bar}] {pct:5.1f}%{size_str}{speed_str}{eta_str}"
         sys.stderr.write(line[: cols - 1] + "\033[K")
         sys.stderr.flush()
 
     def converting(self) -> None:
         self._active = True
-        sys.stderr.write("\r⚙  Conversion en cours...\033[K")
+        sys.stderr.write("\rConversion en cours...\033[K")
         sys.stderr.flush()
 
     def done(self, message: str = "") -> None:

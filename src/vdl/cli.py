@@ -83,7 +83,7 @@ def _list_sites() -> None:
         print("\n".join(names))
         print(f"\n{len(names)} extracteurs supportés")
     except ImportError:
-        print("❌ yt-dlp non installé", file=sys.stderr)
+        print("yt-dlp non installe", file=sys.stderr)
         sys.exit(1)
 
 
@@ -94,8 +94,8 @@ def _do_update() -> None:
         if "vdl" in result.stdout:
             print("→ Mise à jour via pipx...")
             subprocess.run([pipx, "upgrade", "vdl"], check=True)
-            print("\n💡 Pour mettre à jour yt-dlp aussi :")
-            print("   pipx upgrade yt-dlp")
+            print("\nPour mettre a jour yt-dlp aussi :")
+            print("  pipx upgrade yt-dlp")
             return
     except FileNotFoundError:
         pass
@@ -129,10 +129,9 @@ def _run_search(query: str) -> None:
     source_choice = tui_select(
         "Chercher sur ?",
         choices=[
-            {"name": "▶  YouTube", "value": "youtube"},
-            {"name": "☁  SoundCloud", "value": "soundcloud"},
+            {"name": "YouTube", "value": "youtube"},
+            {"name": "SoundCloud", "value": "soundcloud"},
         ],
-        default="youtube",
     )
     if source_choice is None:
         return
@@ -144,11 +143,11 @@ def _run_search(query: str) -> None:
         query = q.strip()
 
     source_name = next((k for k in SOURCES if k == source_choice), "youtube")
-    print(f"\n🔍 Recherche en cours sur {source_name.title()}...")
+    print(f"\nRecherche en cours sur {source_name.title()}...")
 
     results = search_videos(query, source=source_name)
     if not results:
-        print("❌  Aucun résultat.", file=sys.stderr)
+        print("Aucun resultat.", file=sys.stderr)
         sys.exit(1)
 
     def _label(r: dict[str, object]) -> str:
@@ -174,10 +173,10 @@ def _run_search(query: str) -> None:
     from .tui import select as tui_sel
 
     type_choice = tui_sel(
-        "Audio ou vidéo ?",
+        "Audio ou video ?",
         choices=[
-            {"name": "🎬 Vidéo MP4", "value": "video"},
-            {"name": "🎵 Audio MP3", "value": "audio"},
+            {"name": "Video MP4", "value": "video"},
+            {"name": "Audio MP3", "value": "audio"},
         ],
     )
     is_audio = type_choice == "audio"
@@ -246,10 +245,10 @@ def main() -> None:
         try:
             urls = _read_batch_file(args.batch_file)
         except FileNotFoundError:
-            print(f"❌ Fichier introuvable : {args.batch_file}", file=sys.stderr)
+            print(f"Fichier introuvable : {args.batch_file}", file=sys.stderr)
             sys.exit(1)
         if not urls:
-            print("❌ Le fichier batch est vide.", file=sys.stderr)
+            print("Le fichier batch est vide.", file=sys.stderr)
             sys.exit(1)
 
         output = args.output or cfg.output_dir
@@ -279,7 +278,7 @@ def main() -> None:
         for url in urls:
             err = _validate_url(url)
             if err:
-                print(f"❌  URL ignorée ({err}) : {url}", file=sys.stderr)
+                print(f"URL ignoree ({err}) : {url}", file=sys.stderr)
                 fail += 1
                 continue
             rc = dl.download(url, ext, is_audio, quality_selector, audio_kbps)
@@ -287,7 +286,7 @@ def main() -> None:
                 ok += 1
             else:
                 fail += 1
-        print(f"\n✅  {ok} réussi(s)  ❌  {fail} échoué(s)")
+        print(f"\n{ok} reussi(s), {fail} echoue(s)")
 
         # Notification mise à jour
         _show_update_notification()
@@ -304,7 +303,7 @@ def main() -> None:
     url = args.url.strip()
     err = _validate_url(url)
     if err:
-        print(f"❌ {err}", file=sys.stderr)
+        print(err, file=sys.stderr)
         sys.exit(1)
 
     # Déterminer si c'est de l'audio
@@ -318,7 +317,7 @@ def main() -> None:
     # Valider le format
     if ext not in presets.ALL_EXTS:
         print(
-            f"❌ Format inconnu : {ext}. Formats supportés : {', '.join(sorted(presets.ALL_EXTS))}",
+            f"Format inconnu : {ext}. Formats supportes : {', '.join(sorted(presets.ALL_EXTS))}",
             file=sys.stderr,
         )
         sys.exit(1)

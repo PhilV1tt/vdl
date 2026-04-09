@@ -21,9 +21,9 @@ def check_deps() -> None:
     if not shutil.which("ffmpeg"):
         missing.append("ffmpeg  →  brew install ffmpeg")
     if missing:
-        print("❌ Dépendances manquantes :", file=sys.stderr)
+        print("Dependances manquantes :", file=sys.stderr)
         for m in missing:
-            print(f"   • {m}", file=sys.stderr)
+            print(f"  {m}", file=sys.stderr)
         sys.exit(1)
 
 
@@ -139,19 +139,19 @@ class Downloader:
 
         for attempt in range(1, self.retries + 1):
             try:
-                logger.info("Récupération des infos pour %s", url)
-                print("🔍 Récupération des infos...")
+                logger.info("Recuperation des infos pour %s", url)
+                print("Recuperation des infos...")
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=False)
-                    title = info.get("title", "Vidéo")
+                    title = info.get("title", "Video")
                     printer.title = title
-                    duration = info.get("duration", 0)
+                    duration = int(info.get("duration") or 0)
                     dur_str = f"{duration // 60}:{duration % 60:02d}" if duration else ""
-                    print(f"📺 {title}" + (f"  ({dur_str})" if dur_str else ""))
+                    print(f"{title}" + (f"  ({dur_str})" if dur_str else ""))
                     print()
                     ydl.download([url])
 
-                printer.done(f"✅  Sauvegardé dans {self.output_dir}/")
+                printer.done(f"Sauvegarde dans {self.output_dir}/")
                 from .history import log_download
 
                 log_download(url, title, ext, self.output_dir, "ok")
@@ -163,35 +163,35 @@ class Downloader:
                 if is_network and attempt < self.retries:
                     printer.done()
                     wait = 2**attempt
-                    print(f"⚠  Erreur réseau. Nouvel essai {attempt}/{self.retries - 1} dans {wait}s...")
+                    print(f"Erreur reseau. Nouvel essai {attempt}/{self.retries - 1} dans {wait}s...")
                     time.sleep(wait)
                     printer = ProgressPrinter()
                     continue
                 printer.done()
                 if "Unsupported URL" in msg:
-                    print(f"❌  Site non supporté par yt-dlp : {url}", file=sys.stderr)
-                    print("   Lance `vdl --list-sites` pour voir les sites supportés.", file=sys.stderr)
+                    print(f"Site non supporte par yt-dlp : {url}", file=sys.stderr)
+                    print("  Lance `vdl --list-sites` pour voir les sites supportes.", file=sys.stderr)
                 elif "Private video" in msg:
-                    print("❌  Vidéo privée. Vérifie l'URL ou tes permissions.", file=sys.stderr)
+                    print("Video privee. Verifie l'URL ou tes permissions.", file=sys.stderr)
                 elif "Video unavailable" in msg:
-                    print("❌  Vidéo indisponible (supprimée ou restreinte géographiquement).", file=sys.stderr)
+                    print("Video indisponible (supprimee ou restreinte geographiquement).", file=sys.stderr)
                 elif "HTTP Error 429" in msg:
-                    print("❌  Trop de requêtes (429). Attends quelques minutes avant de réessayer.", file=sys.stderr)
+                    print("Trop de requetes (429). Attends quelques minutes avant de reessayer.", file=sys.stderr)
                 elif "Unable to extract" in msg:
-                    print("❌  Impossible d'extraire. Essaie : yt-dlp -U", file=sys.stderr)
+                    print("Impossible d'extraire. Essaie : yt-dlp -U", file=sys.stderr)
                 else:
                     clean = msg.replace("ERROR: ", "").strip()
-                    print(f"❌  {clean}", file=sys.stderr)
+                    print(clean, file=sys.stderr)
                 return 1
 
             except KeyboardInterrupt:
                 printer.done()
-                print("\n🛑  Annulé.")
+                print("\nAnnule.")
                 return 130
 
             except Exception as e:
                 printer.done()
-                print(f"❌  Erreur inattendue : {e}", file=sys.stderr)
+                print(f"Erreur : {e}", file=sys.stderr)
                 return 1
 
         return 1

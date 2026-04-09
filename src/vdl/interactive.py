@@ -26,10 +26,10 @@ def _download_flow(url: str) -> int:
     """Collecte les options et lance le téléchargement."""
     # Type
     type_choice = select(
-        "Audio ou vidéo ?",
+        "Audio ou video ?",
         choices=[
-            {"name": "🎬 Vidéo", "value": "video"},
-            {"name": "🎵 Audio", "value": "audio"},
+            {"name": "Video", "value": "video"},
+            {"name": "Audio", "value": "audio"},
         ],
     )
     if type_choice is None:
@@ -109,8 +109,8 @@ def _download_flow(url: str) -> int:
     print("  └──────────────────────────────────────────┘")
     print()
 
-    if not confirm("Confirmer le téléchargement ?", default=True):
-        print("🛑  Annulé.")
+    if not confirm("Confirmer le telechargement ?", default=True):
+        print("Annule.")
         return 0
 
     print()
@@ -130,8 +130,8 @@ def _search_flow() -> int:
     source_choice = select(
         "Chercher sur ?",
         choices=[
-            {"name": "▶  YouTube", "value": "youtube"},
-            {"name": "☁  SoundCloud", "value": "soundcloud"},
+            {"name": "YouTube", "value": "youtube"},
+            {"name": "SoundCloud", "value": "soundcloud"},
         ],
     )
     if source_choice is None:
@@ -142,11 +142,11 @@ def _search_flow() -> int:
         return 0
 
     source_name = next((k for k in SOURCES if k == source_choice), "youtube")
-    print(f"\n🔍 Recherche en cours sur {source_name.title()}...")
+    print(f"\nRecherche en cours sur {source_name.title()}...")
 
     results = search_videos(query.strip(), source=source_name)
     if not results:
-        print("❌  Aucun résultat.", file=sys.stderr)
+        print("Aucun resultat.", file=sys.stderr)
         return 1
 
     from .search import _fmt_duration, _fmt_views
@@ -186,10 +186,10 @@ def run_interactive() -> None:
         action = select(
             "Que voulez-vous faire ?",
             choices=[
-                {"name": "⬇  Télécharger depuis une URL", "value": "download"},
-                {"name": "🔍  Rechercher sur YouTube / SoundCloud", "value": "search"},
-                {"name": "📋  Historique des téléchargements", "value": "history"},
-                {"name": "❌  Quitter", "value": "quit"},
+                {"name": "Telecharger depuis une URL", "value": "download"},
+                {"name": "Rechercher sur YouTube / SoundCloud", "value": "search"},
+                {"name": "Historique", "value": "history"},
+                {"name": "Quitter", "value": "quit"},
             ],
         )
 
@@ -197,13 +197,13 @@ def run_interactive() -> None:
             sys.exit(0)
 
         if action == "download":
-            url = text("🔗 Lien de la vidéo :")
+            url = text("Lien de la video :")
             if not url or not url.strip():
-                print("❌ URL vide.", file=sys.stderr)
+                print("URL vide.", file=sys.stderr)
                 continue
             url = url.strip()
             if not url.startswith(("http://", "https://")):
-                print("❌ L'URL doit commencer par http:// ou https://", file=sys.stderr)
+                print("L'URL doit commencer par http:// ou https://", file=sys.stderr)
                 continue
             rc = _download_flow(url)
             sys.exit(rc)

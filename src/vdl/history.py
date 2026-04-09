@@ -38,7 +38,7 @@ def show_history(n: int = 20) -> None:
         try:
             entry = json.loads(line)
             ts = entry.get("timestamp", "?")[:19].replace("T", " ")
-            status = "✅" if entry.get("status") == "ok" else "❌"
+            status = "ok " if entry.get("status") == "ok" else "err"
             print(f"  {status}  {ts}  [{entry.get('format', '?')}]  {entry.get('title', entry.get('url', '?'))}")
         except json.JSONDecodeError:
             continue

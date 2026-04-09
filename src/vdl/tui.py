@@ -29,23 +29,7 @@ def enable_ansi_windows() -> None:
 
 # ── Style questionary ──────────────────────────────────────────────────────
 
-try:
-    from questionary import Style as _QStyle
-
-    _STYLE: _QStyle | None = _QStyle(
-        [
-            ("qmark", "fg:#5f87ff bold"),
-            ("question", "bold"),
-            ("answer", "fg:#5fffaf bold"),
-            ("pointer", "fg:#5f87ff bold"),
-            ("highlighted", "fg:#5f87ff bold"),
-            ("selected", "fg:#5fffaf"),
-            ("separator", "fg:#444444"),
-            ("instruction", "fg:#888888"),
-        ]
-    )
-except ImportError:
-    _STYLE = None
+_STYLE = None
 
 
 # ── Wrappers publics ───────────────────────────────────────────────────────
