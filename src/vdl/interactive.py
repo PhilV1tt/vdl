@@ -37,19 +37,21 @@ _ASCII = [
 
 
 def _auto_update() -> None:
-    """Met à jour automatiquement si une nouvelle version est disponible."""
+    """Propose une mise à jour si une nouvelle version est disponible."""
     from .updater import do_update, get_latest_version
 
     latest = get_latest_version()
     if not latest:
         return
 
-    print(f"  {BOLD}{YELLOW}↑{RESET}  {t('update_available', version=latest)}  {DIM}— mise à jour...{RESET}")
+    print(f"  {BOLD}{YELLOW}↑{RESET}  {t('update_available', version=latest)}")
     print()
-    do_update()
-    print()
-    animate_separator(color=CYAN)
-    print()
+    if confirm(t("update_now"), default=True):
+        print()
+        do_update()
+        print()
+        animate_separator(color=CYAN)
+        print()
 
 
 def _banner() -> None:
