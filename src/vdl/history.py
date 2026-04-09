@@ -30,7 +30,7 @@ def log_download(
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
-def show_history(n: int = 20) -> None:
+def show_history(n: int = 50) -> None:
     if not _HISTORY_PATH.exists():
         print(t("no_history"))
         return

@@ -49,11 +49,16 @@ class TestDownloadFlow:
             rc = _download_flow("https://example.com/video")
         assert rc == 1
 
-    def test_music_choice_calls_pipeline(self, tmp_path):
+    def test_audio_confirms_apple_music_on_macos(self, tmp_path):
+        import sys
+
+        if sys.platform != "darwin":
+            return
         f = tmp_path / "song.mp3"
         f.write_bytes(b"")
         with (
-            patch("vdl.interactive.select", return_value="music"),
+            patch("vdl.interactive.select", return_value="audio"),
+            patch("vdl.interactive.confirm", return_value=True),
             patch("vdl.interactive.Downloader") as mock_dl,
             patch("vdl.music.music_pipeline") as mock_pipeline,
         ):

@@ -17,6 +17,7 @@ from .tui import (
     Spinner,
     animate_separator,
     clear_screen,
+    confirm,
     fade_out,
     select,
     text,
@@ -71,20 +72,18 @@ def _banner() -> None:
 
 
 def _download_flow(url: str) -> int:
-    """Demande Audio / Vidéo / Apple Music, puis télécharge."""
+    """Demande Audio ou Vidéo, télécharge, propose Apple Music si audio sur macOS."""
     type_choice = select(
         t("audio_or_video"),
         choices=[
             {"name": t("opt_video") + "  (MP4)", "value": "video"},
             {"name": t("opt_audio") + "  (MP3)", "value": "audio"},
-            {"name": t("opt_music") + "  (MP3 → Apple Music)", "value": "music"},
         ],
     )
     if type_choice is None:
         return 0
 
-    do_music = type_choice == "music"
-    is_audio = type_choice in ("audio", "music")
+    is_audio = type_choice == "audio"
     ext = "mp3" if is_audio else "mp4"
     from . import presets
 
@@ -94,10 +93,12 @@ def _download_flow(url: str) -> int:
     dl = Downloader(output_dir=DEFAULT_OUTPUT)
     result = dl.download(url, ext, is_audio, quality_selector, audio_kbps)
 
-    if do_music and result.exit_code == 0 and result.file_path:
-        from .music import music_pipeline
+    if is_audio and result.exit_code == 0 and result.file_path and sys.platform == "darwin":
+        print()
+        if confirm(t("music_import_ask"), default=False):
+            from .music import music_pipeline
 
-        music_pipeline(result.file_path, result.info)
+            music_pipeline(result.file_path, result.info)
 
     return result.exit_code
 
