@@ -121,7 +121,7 @@ def do_update() -> None:
     try:
         result = subprocess.run([pipx, "list"], capture_output=True, text=True)
         if "vdl" in result.stdout:
-            print(f"→ {t('update_pipx')}")
+            print(f"→ {t('update_pipx')}", flush=True)
             try:
                 subprocess.run([pipx, "upgrade", "vdl"], check=True)
             except subprocess.CalledProcessError as e:
@@ -131,7 +131,7 @@ def do_update() -> None:
             return
     except FileNotFoundError:
         pass
-    print(f"→ {t('update_pip')}")
+    print(f"→ {t('update_pip')}", flush=True)
     try:
         subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "vdl"], check=True)
     except subprocess.CalledProcessError as e:
