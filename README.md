@@ -1,6 +1,6 @@
 # vdl — Téléchargeur universel de vidéos
 
-Fait avec amour pour Julien, qui voulait juste télécharger ses vidéos sans prise de tête.
+Fait avec amour pour Julien :))))
 
 Télécharge des vidéos et de l'audio depuis YouTube, Vimeo, TikTok, SoundCloud et [1000+ autres sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md).
 
