@@ -2,11 +2,11 @@
 
 Fait avec amour pour Julien :))))
 
-Télécharge des vidéos et de l'audio depuis YouTube, Vimeo, TikTok, SoundCloud et [1000+ autres sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md).
+Téléchargez des vidéos et de l'audio depuis YouTube, Vimeo, TikTok, SoundCloud et [1000+ autres sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md).
 
 ## Installation (Mac)
 
-Colle cette commande dans le Terminal et appuie sur Entrée :
+Collez cette commande dans le Terminal et appuiez sur Entrée :
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/PhilV1tt/VideoDownloader/main/install-mac.sh)
@@ -18,7 +18,7 @@ C'est tout. Le script installe tout automatiquement.
 
 ### Mode interactif (le plus simple)
 
-Lance simplement :
+Lancez simplement :
 
 ```bash
 vdl
