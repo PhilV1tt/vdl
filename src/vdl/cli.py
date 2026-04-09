@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import subprocess
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -90,28 +89,9 @@ def _list_sites() -> None:
 
 
 def _do_update() -> None:
-    from .i18n import t
+    from .updater import do_update
 
-    pipx = "pipx"
-    try:
-        result = subprocess.run([pipx, "list"], capture_output=True, text=True)
-        if "vdl" in result.stdout:
-            print(f"→ {t('update_pipx')}")
-            try:
-                subprocess.run([pipx, "upgrade", "vdl"], check=True)
-            except subprocess.CalledProcessError as e:
-                print(f"Update failed: {e}", file=sys.stderr)
-                sys.exit(1)
-            print(f"\n{t('update_yt_dlp')}")
-            return
-    except FileNotFoundError:
-        pass
-    print(f"→ {t('update_pip')}")
-    try:
-        subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "vdl"], check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"Update failed: {e}", file=sys.stderr)
-        sys.exit(1)
+    do_update()
 
 
 def _validate_url(url: str) -> str | None:

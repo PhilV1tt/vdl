@@ -101,3 +101,38 @@ def get_update_notification() -> str | None:
 
         return t("update_available", version=_latest_version)
     return None
+
+
+def get_latest_version() -> str | None:
+    """Retourne la dernière version disponible si plus récente que l'actuelle."""
+    if _check_thread is not None:
+        _check_thread.join(timeout=0.5)
+    return _latest_version
+
+
+def do_update() -> None:
+    """Lance la mise à jour via pipx ou pip."""
+    import subprocess
+    import sys
+
+    from .i18n import t
+
+    pipx = "pipx"
+    try:
+        result = subprocess.run([pipx, "list"], capture_output=True, text=True)
+        if "vdl" in result.stdout:
+            print(f"→ {t('update_pipx')}")
+            try:
+                subprocess.run([pipx, "upgrade", "vdl"], check=True)
+            except subprocess.CalledProcessError as e:
+                print(f"Update failed: {e}", file=sys.stderr)
+                return
+            print(f"\n{t('update_yt_dlp')}")
+            return
+    except FileNotFoundError:
+        pass
+    print(f"→ {t('update_pip')}")
+    try:
+        subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "vdl"], check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Update failed: {e}", file=sys.stderr)

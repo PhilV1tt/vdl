@@ -14,6 +14,7 @@ from .tui import (
     CYAN,
     DIM,
     RESET,
+    YELLOW,
     Spinner,
     animate_separator,
     clear_screen,
@@ -33,6 +34,26 @@ _ASCII = [
     r"  ╚████╔╝ ██████╔╝███████╗",
     r"   ╚═══╝  ╚═════╝ ╚══════╝",
 ]
+
+
+def _check_and_prompt_update() -> None:
+    """Si une mise à jour est disponible, demande à l'utilisateur s'il veut l'installer."""
+    from .updater import do_update, get_latest_version
+
+    latest = get_latest_version()
+    if not latest:
+        return
+
+    print(f"  {BOLD}{YELLOW}↑{RESET}  {t('update_available', version=latest)}")
+    print()
+    from .tui import confirm
+
+    if confirm(t("update_now"), default=True):
+        print()
+        do_update()
+        print()
+        animate_separator(color=CYAN)
+        print()
 
 
 def _banner() -> None:
@@ -132,6 +153,7 @@ def _history_flow() -> None:
 
 def run_interactive() -> None:
     _banner()
+    _check_and_prompt_update()
 
     while True:
         action = select(
