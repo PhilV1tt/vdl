@@ -7,6 +7,8 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from . import __version__, presets
+from .config import VdlConfig
+from .downloader import Downloader
 
 
 def _make_parser() -> argparse.ArgumentParser:
@@ -120,19 +122,17 @@ def _run_search(query: str) -> None:
     sys.exit(_search_flow())
 
 
-def _build_downloader(args: argparse.Namespace, cfg: object) -> object:
+def _build_downloader(args: argparse.Namespace, cfg: VdlConfig) -> Downloader:
     """Construit un Downloader à partir des args CLI et de la config."""
-    from .downloader import Downloader
-
     return Downloader(
-        output_dir=args.output or cfg.output_dir,  # type: ignore[union-attr]
+        output_dir=args.output or cfg.output_dir,
         playlist=args.playlist,
-        embed_thumbnail=False if args.no_thumbnail else cfg.embed_thumbnail,  # type: ignore[union-attr]
-        sponsorblock=args.sponsorblock or cfg.sponsorblock,  # type: ignore[union-attr]
-        subs=args.subs or cfg.subs,  # type: ignore[union-attr]
-        subs_lang=args.subs_lang or cfg.subs_lang,  # type: ignore[union-attr]
-        output_template=args.output_template or cfg.output_template,  # type: ignore[union-attr]
-        retries=cfg.retries,  # type: ignore[union-attr]
+        embed_thumbnail=False if args.no_thumbnail else cfg.embed_thumbnail,
+        sponsorblock=args.sponsorblock or cfg.sponsorblock,
+        subs=args.subs or cfg.subs,
+        subs_lang=args.subs_lang or cfg.subs_lang,
+        output_template=args.output_template or cfg.output_template,
+        retries=cfg.retries,
     )
 
 
