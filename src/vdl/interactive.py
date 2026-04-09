@@ -3,18 +3,32 @@
 from __future__ import annotations
 
 import sys
+import time
 
 from . import __version__
 from .downloader import DEFAULT_OUTPUT, Downloader
 from .i18n import t
-from .tui import BOLD, CYAN, DIM, RESET, Spinner, select, text
+from .tui import BLUE, BOLD, CYAN, DIM, RESET, Spinner, select, text
 
 # ── Bannière ───────────────────────────────────────────────────────────────
+
+_ASCII = [
+    r" ██╗   ██╗██████╗ ██╗     ",
+    r" ██║   ██║██╔══██╗██║     ",
+    r" ██║   ██║██║  ██║██║     ",
+    r" ╚██╗ ██╔╝██║  ██║██║     ",
+    r"  ╚████╔╝ ██████╔╝███████╗",
+    r"   ╚═══╝  ╚═════╝ ╚══════╝",
+]
 
 
 def _banner() -> None:
     print()
-    print(f"  {BOLD}{CYAN}VDL{RESET}  {DIM}{t('banner_sub')}{RESET}  {CYAN}v{__version__}{RESET}")
+    for i, line in enumerate(_ASCII):
+        color = CYAN if i < 3 else BLUE
+        print(f"{BOLD}{color}{line}{RESET}")
+        time.sleep(0.04)
+    print(f"  {DIM}{t('banner_sub')}  {RESET}{CYAN}v{__version__}{RESET}")
     print()
 
 

@@ -19,8 +19,8 @@ class TestDownloadFlow:
             rc = _download_flow("https://example.com/audio")
         assert rc == 0
         call_args = mock_dl.return_value.download.call_args[0]
-        assert call_args[1] == "mp3"   # ext
-        assert call_args[2] is True    # is_audio
+        assert call_args[1] == "mp3"  # ext
+        assert call_args[2] is True  # is_audio
 
     def test_video_downloads_mp4(self):
         with (
@@ -31,8 +31,8 @@ class TestDownloadFlow:
             rc = _download_flow("https://example.com/video")
         assert rc == 0
         call_args = mock_dl.return_value.download.call_args[0]
-        assert call_args[1] == "mp4"   # ext
-        assert call_args[2] is False   # is_audio
+        assert call_args[1] == "mp4"  # ext
+        assert call_args[2] is False  # is_audio
 
     def test_cancel_on_type_selection(self):
         with patch("vdl.interactive.select", return_value=None):
