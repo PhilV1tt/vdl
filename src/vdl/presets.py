@@ -40,3 +40,10 @@ VIDEO_QUALITY_MAP: dict[str, str] = {key: VIDEO_QUALITIES[i]["value"] for i, key
 AUDIO_EXTS: set[str] = {f["ext"] for f in AUDIO_FORMATS}
 VIDEO_EXTS: set[str] = {f["ext"] for f in VIDEO_FORMATS}
 ALL_EXTS: set[str] = AUDIO_EXTS | VIDEO_EXTS
+
+
+def build_quality_selector(is_audio: bool, quality_key: str = "best") -> tuple[str, str]:
+    """Retourne (quality_selector, audio_kbps) pour yt-dlp."""
+    if is_audio:
+        return "bestaudio/best", "320"
+    return VIDEO_QUALITY_MAP.get(quality_key, "bestvideo+bestaudio/best"), "0"

@@ -4,23 +4,19 @@ import shutil
 import sys
 
 from .i18n import t
+from .tui import CYAN, DIM, RESET
 
-_CYAN = "\033[96m"
 _GREEN = "\033[92m"
-_DIM = "\033[2m"
-_RESET = "\033[0m"
 
 
 def _bar(pct: float, width: int = 20) -> str:
-    filled = round(width * pct / 100)
-    filled = max(0, min(width, filled))
+    filled = max(0, min(width, round(width * pct / 100)))
     return "█" * filled + "░" * (width - filled)
 
 
 def _bar_colored(pct: float, width: int = 20) -> str:
-    filled = round(width * pct / 100)
-    filled = max(0, min(width, filled))
-    return f"{_CYAN}{'█' * filled}{_DIM}{'░' * (width - filled)}{_RESET}"
+    filled = max(0, min(width, round(width * pct / 100)))
+    return f"{CYAN}{'█' * filled}{DIM}{'░' * (width - filled)}{RESET}"
 
 
 class ProgressPrinter:
@@ -37,7 +33,7 @@ class ProgressPrinter:
         eta_str = f"  ETA {int(eta_sec) // 60:02d}:{int(eta_sec) % 60:02d}" if eta_sec else ""
         size_str = f"  {self.total_bytes / 1024 / 1024:.1f} MiB" if self.total_bytes else ""
         title = (self.title[:34] + "…") if len(self.title) > 35 else self.title
-        line = f"\r{title}  [{bar}] {_CYAN}{pct:5.1f}%{_RESET}{_DIM}{size_str}{speed_str}{eta_str}{_RESET}"
+        line = f"\r{title}  [{bar}] {CYAN}{pct:5.1f}%{RESET}{DIM}{size_str}{speed_str}{eta_str}{RESET}"
         sys.stderr.write(line[: cols - 1] + "\033[K")
         sys.stderr.flush()
 

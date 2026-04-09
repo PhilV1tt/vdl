@@ -16,11 +16,22 @@ class VdlConfig:
     subs_lang: str = "fr"
     output_template: str = "%(title)s.%(ext)s"
     retries: int = 3
-    # Unused field kept for forward compatibility
     _extra: dict[str, object] = field(default_factory=dict, repr=False)
 
 
 _CONFIG_PATH = Path.home() / ".config" / "vdl" / "config.toml"
+
+_CONVERTERS: dict[str, object] = {
+    "output_dir": str,
+    "default_format": lambda v: str(v) if v else None,
+    "default_quality": str,
+    "embed_thumbnail": bool,
+    "sponsorblock": bool,
+    "subs": bool,
+    "subs_lang": str,
+    "output_template": str,
+    "retries": lambda v: int(str(v)),
+}
 
 
 def load_config(path: Path = _CONFIG_PATH) -> VdlConfig:
@@ -43,27 +54,8 @@ def load_config(path: Path = _CONFIG_PATH) -> VdlConfig:
         return VdlConfig()
 
     cfg = VdlConfig()
-    _apply(cfg, raw)
-    return cfg
-
-
-def _apply(cfg: VdlConfig, raw: dict[str, object]) -> None:
     for key, value in raw.items():
-        if key == "output_dir":
-            cfg.output_dir = str(value)
-        elif key == "default_format":
-            cfg.default_format = str(value) if value else None
-        elif key == "default_quality":
-            cfg.default_quality = str(value)
-        elif key == "embed_thumbnail":
-            cfg.embed_thumbnail = bool(value)
-        elif key == "sponsorblock":
-            cfg.sponsorblock = bool(value)
-        elif key == "subs":
-            cfg.subs = bool(value)
-        elif key == "subs_lang":
-            cfg.subs_lang = str(value)
-        elif key == "output_template":
-            cfg.output_template = str(value)
-        elif key == "retries":
-            cfg.retries = int(str(value))
+        converter = _CONVERTERS.get(key)
+        if converter:
+            setattr(cfg, key, converter(value))  # type: ignore[operator]
+    return cfg

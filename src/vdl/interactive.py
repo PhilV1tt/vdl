@@ -88,8 +88,9 @@ def _download_flow(url: str) -> int:
 
     is_audio = type_choice == "audio"
     ext = "mp3" if is_audio else "mp4"
-    quality_selector = "bestaudio/best" if is_audio else "bestvideo+bestaudio/best"
-    audio_kbps = "320" if is_audio else "0"
+    from . import presets
+
+    quality_selector, audio_kbps = presets.build_quality_selector(is_audio)
 
     print()
     dl = Downloader(output_dir=DEFAULT_OUTPUT)

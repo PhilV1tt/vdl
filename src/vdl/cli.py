@@ -58,11 +58,11 @@ Exemples :
     )
     p.add_argument("--no-thumbnail", action="store_true", help="Ne pas embarquer la miniature dans le fichier")
     p.add_argument("--subs", action="store_true", help="Télécharger et embarquer les sous-titres")
-    p.add_argument("--subs-lang", default="fr", metavar="LANGUE", help="Langue des sous-titres (défaut: fr)")
+    p.add_argument("--subs-lang", default=None, metavar="LANGUE", help="Langue des sous-titres (défaut: fr)")
     p.add_argument("--sponsorblock", action="store_true", help="Supprimer les segments SponsorBlock")
     p.add_argument(
         "--output-template",
-        default="%(title)s.%(ext)s",
+        default=None,
         metavar="TEMPLATE",
         help="Template yt-dlp pour le nom de fichier (défaut: %%(title)s.%%(ext)s)",
     )
@@ -120,6 +120,22 @@ def _run_search(query: str) -> None:
     sys.exit(_search_flow())
 
 
+def _build_downloader(args: argparse.Namespace, cfg: object) -> object:
+    """Construit un Downloader à partir des args CLI et de la config."""
+    from .downloader import Downloader
+
+    return Downloader(
+        output_dir=args.output or cfg.output_dir,  # type: ignore[union-attr]
+        playlist=args.playlist,
+        embed_thumbnail=False if args.no_thumbnail else cfg.embed_thumbnail,  # type: ignore[union-attr]
+        sponsorblock=args.sponsorblock or cfg.sponsorblock,  # type: ignore[union-attr]
+        subs=args.subs or cfg.subs,  # type: ignore[union-attr]
+        subs_lang=args.subs_lang or cfg.subs_lang,  # type: ignore[union-attr]
+        output_template=args.output_template or cfg.output_template,  # type: ignore[union-attr]
+        retries=cfg.retries,  # type: ignore[union-attr]
+    )
+
+
 def main() -> None:
     # ── Init plateforme ────────────────────────────────────────────────────
     from .tui import enable_ansi_windows
@@ -127,7 +143,6 @@ def main() -> None:
     enable_ansi_windows()
 
     # ── Sous-commande search ───────────────────────────────────────────────
-    # Géré avant argparse pour supporter : vdl search "query"
     raw_args = sys.argv[1:]
     if raw_args and raw_args[0] == "search":
         query = " ".join(raw_args[1:])
@@ -176,29 +191,11 @@ def main() -> None:
             print("Le fichier batch est vide.", file=sys.stderr)
             sys.exit(1)
 
-        output = args.output or cfg.output_dir
         is_audio = args.audio
-        fmt = args.format.lower() if args.format else (cfg.default_format or ("mp3" if is_audio else "mp4"))
-        ext = fmt
-        _quality_key = args.quality or cfg.default_quality
-        _default_sel = "bestvideo+bestaudio/best"
-        quality_selector = "bestaudio/best" if is_audio else presets.VIDEO_QUALITY_MAP.get(_quality_key, _default_sel)
-        audio_kbps = "320" if is_audio else "0"
+        ext = (args.format.lower() if args.format else None) or cfg.default_format or ("mp3" if is_audio else "mp4")
+        quality_selector, audio_kbps = presets.build_quality_selector(is_audio, args.quality or cfg.default_quality)
+        dl = _build_downloader(args, cfg)
 
-        from .downloader import Downloader
-
-        dl = Downloader(
-            output_dir=output,
-            playlist=args.playlist,
-            embed_thumbnail=not args.no_thumbnail if args.no_thumbnail else cfg.embed_thumbnail,
-            sponsorblock=args.sponsorblock or cfg.sponsorblock,
-            subs=args.subs or cfg.subs,
-            subs_lang=args.subs_lang if args.subs_lang != "fr" else cfg.subs_lang,
-            output_template=(
-                args.output_template if args.output_template != "%(title)s.%(ext)s" else cfg.output_template
-            ),
-            retries=cfg.retries,
-        )
         ok = fail = 0
         for url in urls:
             err = _validate_url(url)
@@ -206,14 +203,12 @@ def main() -> None:
                 print(f"URL ignoree ({err}) : {url}", file=sys.stderr)
                 fail += 1
                 continue
-            rc = dl.download(url, ext, is_audio, quality_selector, audio_kbps)
+            rc = dl.download(url, ext, is_audio, quality_selector, audio_kbps)  # type: ignore[union-attr]
             if rc == 0:
                 ok += 1
             else:
                 fail += 1
         print(f"\n{ok} reussi(s), {fail} echoue(s)")
-
-        # Notification mise à jour
         _show_update_notification()
         sys.exit(0 if fail == 0 else 1)
 
@@ -236,10 +231,8 @@ def main() -> None:
     if not is_audio and not args.video and args.format and args.format.lower() in presets.AUDIO_EXTS:
         is_audio = True
 
-    # Format de sortie
     ext = args.format.lower() if args.format else ("mp3" if is_audio else "mp4")
 
-    # Valider le format
     if ext not in presets.ALL_EXTS:
         print(
             f"Format inconnu : {ext}. Formats supportes : {', '.join(sorted(presets.ALL_EXTS))}",
@@ -247,31 +240,10 @@ def main() -> None:
         )
         sys.exit(1)
 
-    # Sélecteur de qualité yt-dlp
-    if is_audio:
-        quality_selector = "bestaudio/best"
-        audio_kbps = "320"
-    else:
-        quality_selector = presets.VIDEO_QUALITY_MAP.get(args.quality, "bestvideo+bestaudio/best")
-        audio_kbps = "0"
+    quality_selector, audio_kbps = presets.build_quality_selector(is_audio, args.quality)
+    dl = _build_downloader(args, cfg)
+    rc = dl.download(url, ext, is_audio, quality_selector, audio_kbps)  # type: ignore[union-attr]
 
-    output = args.output or cfg.output_dir
-
-    from .downloader import Downloader
-
-    dl = Downloader(
-        output_dir=output,
-        playlist=args.playlist,
-        embed_thumbnail=not args.no_thumbnail if args.no_thumbnail else cfg.embed_thumbnail,
-        sponsorblock=args.sponsorblock or cfg.sponsorblock,
-        subs=args.subs or cfg.subs,
-        subs_lang=args.subs_lang if args.subs_lang != "fr" else cfg.subs_lang,
-        output_template=args.output_template if args.output_template != "%(title)s.%(ext)s" else cfg.output_template,
-        retries=cfg.retries,
-    )
-    rc = dl.download(url, ext, is_audio, quality_selector, audio_kbps)
-
-    # Notification mise à jour
     _show_update_notification()
     sys.exit(rc)
 

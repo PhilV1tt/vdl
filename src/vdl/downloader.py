@@ -14,6 +14,24 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_OUTPUT = str(Path.home() / "Downloads")
 
+_ERROR_PATTERNS: list[tuple[str, str]] = [
+    ("Unsupported URL", "err_unsupported"),
+    ("Private video", "err_private"),
+    ("Video unavailable", "err_unavailable"),
+    ("HTTP Error 429", "err_429"),
+    ("Unable to extract", "err_extract"),
+]
+
+
+def _print_error(msg: str, url: str = "") -> None:
+    for pattern, key in _ERROR_PATTERNS:
+        if pattern in msg:
+            print(t(key, url=url) if key == "err_unsupported" else t(key), file=sys.stderr)
+            if key == "err_unsupported":
+                print(t("err_unsupported_hint"), file=sys.stderr)
+            return
+    print(msg.replace("ERROR: ", "").strip(), file=sys.stderr)
+
 
 def check_deps() -> None:
     import importlib.util
@@ -174,19 +192,7 @@ class Downloader:
                     printer = ProgressPrinter()
                     continue
                 printer.done()
-                if "Unsupported URL" in msg:
-                    print(t("err_unsupported", url=url), file=sys.stderr)
-                    print(t("err_unsupported_hint"), file=sys.stderr)
-                elif "Private video" in msg:
-                    print(t("err_private"), file=sys.stderr)
-                elif "Video unavailable" in msg:
-                    print(t("err_unavailable"), file=sys.stderr)
-                elif "HTTP Error 429" in msg:
-                    print(t("err_429"), file=sys.stderr)
-                elif "Unable to extract" in msg:
-                    print(t("err_extract"), file=sys.stderr)
-                else:
-                    print(msg.replace("ERROR: ", "").strip(), file=sys.stderr)
+                _print_error(msg, url)
                 return 1
 
             except KeyboardInterrupt:
