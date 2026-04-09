@@ -1,12 +1,15 @@
+import logging
 import os
-import sys
 import shutil
+import sys
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_OUTPUT = str(Path.home() / "Downloads")
 
 
-def check_deps():
+def check_deps() -> None:
     missing = []
     try:
         import yt_dlp  # noqa: F401
@@ -32,6 +35,44 @@ class Downloader:
         self.playlist = playlist
         self.embed_thumbnail = embed_thumbnail
 
+    def _build_ydl_opts(
+        self,
+        ext: str,
+        is_audio: bool,
+        quality_selector: str,
+        audio_kbps: str,
+        progress_hook,
+    ) -> dict:
+        opts: dict = {
+            "format": quality_selector,
+            "outtmpl": os.path.join(self.output_dir, "%(title)s.%(ext)s"),
+            "progress_hooks": [progress_hook],
+            "noplaylist": not self.playlist,
+            "quiet": True,
+            "no_warnings": True,
+        }
+
+        if is_audio:
+            opts["postprocessors"] = [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": ext,
+                    "preferredquality": audio_kbps if ext == "mp3" else "0",
+                },
+                {"key": "FFmpegMetadata"},
+            ]
+            if self.embed_thumbnail:
+                opts["postprocessors"].append({"key": "EmbedThumbnail"})
+                opts["writethumbnail"] = True
+        else:
+            opts["merge_output_format"] = ext
+            if ext not in ("mp4", "mkv", "webm"):
+                opts["postprocessors"] = [
+                    {"key": "FFmpegVideoConvertor", "preferedformat": ext},
+                ]
+
+        return opts
+
     def download(
         self,
         url: str,
@@ -41,11 +82,12 @@ class Downloader:
         audio_kbps: str = "320",
     ) -> int:
         import yt_dlp
+
         from .progress import ProgressPrinter
 
         printer = ProgressPrinter()
 
-        def progress_hook(d):
+        def progress_hook(d: dict) -> None:
             if d["status"] == "downloading":
                 if not printer.title:
                     info = d.get("info_dict", {})
@@ -59,35 +101,10 @@ class Downloader:
             elif d["status"] == "finished":
                 printer.converting()
 
-        ydl_opts: dict = {
-            "format": quality_selector,
-            "outtmpl": os.path.join(self.output_dir, "%(title)s.%(ext)s"),
-            "progress_hooks": [progress_hook],
-            "noplaylist": not self.playlist,
-            "quiet": True,
-            "no_warnings": True,
-        }
-
-        if is_audio:
-            ydl_opts["postprocessors"] = [
-                {
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": ext,
-                    "preferredquality": audio_kbps if ext == "mp3" else "0",
-                },
-                {"key": "FFmpegMetadata"},
-            ]
-            if self.embed_thumbnail:
-                ydl_opts["postprocessors"].append({"key": "EmbedThumbnail"})
-                ydl_opts["writethumbnail"] = True
-        else:
-            ydl_opts["merge_output_format"] = ext
-            if ext not in ("mp4", "mkv", "webm"):
-                ydl_opts["postprocessors"] = [
-                    {"key": "FFmpegVideoConvertor", "preferedformat": ext},
-                ]
+        ydl_opts = self._build_ydl_opts(ext, is_audio, quality_selector, audio_kbps, progress_hook)
 
         try:
+            logger.info("Récupération des infos pour %s", url)
             print("🔍 Récupération des infos...")
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
@@ -109,7 +126,6 @@ class Downloader:
                 print(f"❌  Site non supporté par yt-dlp : {url}", file=sys.stderr)
                 print("   Lance `vdl --list-sites` pour voir les sites supportés.", file=sys.stderr)
             else:
-                # strip the verbose yt-dlp prefix
                 clean = msg.replace("ERROR: ", "").strip()
                 print(f"❌  {clean}", file=sys.stderr)
             return 1

@@ -1,5 +1,5 @@
-import sys
 import shutil
+import sys
 
 
 def _bar(pct: float, width: int = 20) -> str:
@@ -21,12 +21,12 @@ class ProgressPrinter:
         eta_str = f"  ETA {int(eta_sec) // 60:02d}:{int(eta_sec) % 60:02d}" if eta_sec else ""
         title = (self.title[:34] + "…") if len(self.title) > 35 else self.title
         line = f"\r⬇  {title}  [{bar}] {pct:5.1f}%{speed_str}{eta_str}"
-        sys.stderr.write(line[: cols - 1])
+        sys.stderr.write(line[: cols - 1] + "\033[K")
         sys.stderr.flush()
 
     def converting(self):
         self._active = True
-        sys.stderr.write("\r⚙  Conversion en cours...                                        ")
+        sys.stderr.write("\r⚙  Conversion en cours...\033[K")
         sys.stderr.flush()
 
     def done(self, message: str = ""):

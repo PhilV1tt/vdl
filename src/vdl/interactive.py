@@ -67,7 +67,7 @@ def run_interactive():
         print("\n  Qualité vidéo :")
         q_idx = _pick(presets.VIDEO_QUALITIES, "label")
         quality_selector = presets.VIDEO_QUALITIES[q_idx]["value"]
-        audio_kbps = "320"
+        audio_kbps = "0"
 
     # Dossier de sortie
     print()
