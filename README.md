@@ -1,4 +1,4 @@
-# vdl — Téléchargeur universel de vidéos
+# vdl - Téléchargeur universel de vidéos
 
 Fait avec amour pour Julien :))))
 

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "vdl"
 version = "0.5.3"
-description = "Téléchargeur universel de vidéos — CLI multi-sites basé sur yt-dlp"
+description = "Téléchargeur universel de vidéos - CLI multi-sites basé sur yt-dlp"
 requires-python = ">=3.9"
 dependencies = [
     "yt-dlp>=2024.01.01",

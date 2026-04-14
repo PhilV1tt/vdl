@@ -33,7 +33,7 @@ AUDIO_QUALITIES = [
     {"label": "128 kbps", "value": "128"},
 ]
 
-# Derived from VIDEO_QUALITIES — single source of truth
+# Derived from VIDEO_QUALITIES - single source of truth
 _QUALITY_KEYS = ["best", "2160", "1440", "1080", "720", "480", "360"]
 VIDEO_QUALITY_MAP: dict[str, str] = {key: VIDEO_QUALITIES[i]["value"] for i, key in enumerate(_QUALITY_KEYS)}
 

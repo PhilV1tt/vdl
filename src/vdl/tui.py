@@ -1,4 +1,4 @@
-"""Helpers TUI basés sur questionary — navigation clavier cross-platform."""
+"""Helpers TUI basés sur questionary - navigation clavier cross-platform."""
 
 from __future__ import annotations
 

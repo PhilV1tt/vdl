@@ -219,7 +219,7 @@ def music_pipeline(file_path: Path | None, info: dict[str, Any]) -> None:
             parts.append(str(metadata["artist"]))
         if metadata.get("album"):
             parts.append(str(metadata["album"]))
-        print(t("music_lookup_found", info=" — ".join(parts) if parts else title))
+        print(t("music_lookup_found", info=" - ".join(parts) if parts else title))
     else:
         print(t("music_lookup_none"))
 
