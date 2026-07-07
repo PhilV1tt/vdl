@@ -55,6 +55,13 @@ class TestReadBatchFile:
         urls = _read_batch_file(str(f))
         assert urls == ["https://example.com/1"]
 
+    def test_reads_from_stdin(self, monkeypatch):
+        import io
+
+        monkeypatch.setattr(sys, "stdin", io.StringIO("https://example.com/1\nhttps://example.com/2\n"))
+        urls = _read_batch_file("-")
+        assert urls == ["https://example.com/1", "https://example.com/2"]
+
 
 class TestBatchMain:
     def test_batch_missing_file_exits_1(self, monkeypatch, tmp_path):

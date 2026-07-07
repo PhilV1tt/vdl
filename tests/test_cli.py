@@ -12,14 +12,12 @@ def test_parser_defaults():
     args = parser.parse_args(["https://example.com"])
     assert args.url == "https://example.com"
     assert args.audio is False
-    assert args.video is False
     assert args.quality == "best"
     assert args.format is None
     assert args.playlist is False
-    assert args.no_thumbnail is False
     assert args.verbose is False
-    assert args.subs is False
-    assert args.sponsorblock is False
+    assert args.links is False
+    assert args.music is False
 
 
 def test_parser_audio_flag():
@@ -52,23 +50,29 @@ def test_parser_no_url():
     assert args.url is None
 
 
-def test_parser_subs_flag():
+def test_parser_links_flag():
     parser = _make_parser()
-    args = parser.parse_args(["https://example.com", "--subs", "--subs-lang", "en"])
-    assert args.subs is True
-    assert args.subs_lang == "en"
+    args = parser.parse_args(["@QOVESStudio", "--links"])
+    assert args.links is True
+    assert args.url == "@QOVESStudio"
 
 
-def test_parser_sponsorblock_flag():
+def test_parser_music_flag():
     parser = _make_parser()
-    args = parser.parse_args(["https://example.com", "--sponsorblock"])
-    assert args.sponsorblock is True
+    args = parser.parse_args(["https://example.com", "-m"])
+    assert args.music is True
 
 
 def test_parser_batch_file_flag():
     parser = _make_parser()
     args = parser.parse_args(["-b", "urls.txt"])
     assert args.batch_file == "urls.txt"
+
+
+def test_parser_batch_stdin():
+    parser = _make_parser()
+    args = parser.parse_args(["-b", "-"])
+    assert args.batch_file == "-"
 
 
 def test_invalid_format_exits(monkeypatch):
@@ -90,8 +94,8 @@ def test_audio_auto_detected_from_format():
     """When -f is an audio extension without -a, is_audio should be True."""
     parser = _make_parser()
     args = parser.parse_args(["https://example.com", "-f", "mp3"])
-    is_audio = args.audio
-    if not is_audio and not args.video and args.format and args.format.lower() in presets.AUDIO_EXTS:
+    is_audio = args.audio or args.music
+    if not is_audio and args.format and args.format.lower() in presets.AUDIO_EXTS:
         is_audio = True
     assert is_audio is True
 
@@ -99,8 +103,8 @@ def test_audio_auto_detected_from_format():
 def test_video_format_does_not_trigger_audio():
     parser = _make_parser()
     args = parser.parse_args(["https://example.com", "-f", "mp4"])
-    is_audio = args.audio
-    if not is_audio and not args.video and args.format and args.format.lower() in presets.AUDIO_EXTS:
+    is_audio = args.audio or args.music
+    if not is_audio and args.format and args.format.lower() in presets.AUDIO_EXTS:
         is_audio = True
     assert is_audio is False
 

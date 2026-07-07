@@ -18,64 +18,56 @@ def _make_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
 Exemples :
-  vdl https://youtu.be/xxx                      vidéo MP4, meilleure qualité
-  vdl https://vimeo.com/xxx --audio             MP3 320 kbps
-  vdl https://soundcloud.com/a/b -a -f opus     OPUS audio
-  vdl https://twitch.tv/videos/xxx -q 720       vidéo 720p
-  vdl https://youtu.be/xxx --subs               vidéo + sous-titres embarqués
-  vdl https://youtu.be/xxx --sponsorblock       supprimer les segments sponsors
-  vdl -b liste.txt                              télécharger une liste d'URLs
-  vdl search "lofi hip hop"                     rechercher sur YouTube
-  vdl                                           mode interactif (flèches)
+  vdl https://youtu.be/xxx              vidéo MP4, meilleure qualité
+  vdl https://youtu.be/xxx -a           audio MP3
+  vdl https://youtu.be/xxx -q 720       vidéo 720p
+  vdl @QOVESStudio --links              liste les liens d'une chaîne (rien téléchargé)
+  vdl @QOVESStudio --links | vdl -b -   liste puis télécharge toute la chaîne
+  vdl -b liens.txt                      télécharger une liste d'URLs
+  vdl -m https://youtu.be/xxx           MP3 + import Apple Music
+  vdl search "lofi hip hop"             rechercher sur YouTube
+  vdl                                   mode interactif (flèches)
+
+Réglages avancés (sous-titres, SponsorBlock, miniature, template de nom) :
+  ~/.config/vdl/config.toml   —   voir le README.
 """,
     )
-    p.add_argument("url", nargs="?", help="URL de la vidéo/audio (ou 'search' pour rechercher)")
-    p.add_argument("-a", "--audio", action="store_true", help="Extraire l'audio")
-    p.add_argument("-v", "--video", action="store_true", help="Forcer le téléchargement vidéo")
+    p.add_argument("url", nargs="?", help="URL, @chaîne, ou 'search' pour rechercher")
+    p.add_argument("-a", "--audio", action="store_true", help="Extraire l'audio (MP3 par défaut)")
     p.add_argument(
         "-q",
         "--quality",
         default="best",
-        metavar="QUALITÉ",
-        help="Qualité vidéo : best | 2160 | 1440 | 1080 | 720 | 480 | 360  (défaut: best)",
+        metavar="Q",
+        help="best | 2160 | 1440 | 1080 | 720 | 480 | 360  (défaut: best)",
     )
     p.add_argument(
         "-f",
         "--format",
-        metavar="FORMAT",
-        help="Format de sortie : mp3 | m4a | wav | flac | ogg | aac | opus | mp4 | mkv | webm | avi | mov",
+        metavar="FMT",
+        help="mp3 m4a wav flac ogg aac opus  |  mp4 mkv webm avi mov",
     )
-    p.add_argument(
-        "-o",
-        "--output",
-        metavar="DOSSIER",
-        help="Dossier de destination (défaut: ~/Downloads)",
-    )
-    p.add_argument("-p", "--playlist", action="store_true", help="Autoriser le téléchargement de playlists entières")
+    p.add_argument("-o", "--output", metavar="DOSSIER", help="Dossier de destination (défaut: ~/Downloads)")
+    p.add_argument("-p", "--playlist", action="store_true", help="Autoriser les playlists / chaînes entières")
     p.add_argument(
         "-b",
         "--batch-file",
         metavar="FICHIER",
-        help="Fichier texte contenant une URL par ligne",
-    )
-    p.add_argument("--no-thumbnail", action="store_true", help="Ne pas embarquer la miniature dans le fichier")
-    p.add_argument("--subs", action="store_true", help="Télécharger et embarquer les sous-titres")
-    p.add_argument("--subs-lang", default=None, metavar="LANGUE", help="Langue des sous-titres (défaut: fr)")
-    p.add_argument("--sponsorblock", action="store_true", help="Supprimer les segments SponsorBlock")
-    p.add_argument(
-        "--output-template",
-        default=None,
-        metavar="TEMPLATE",
-        help="Template yt-dlp pour le nom de fichier (défaut: %%(title)s.%%(ext)s)",
+        help="Fichier d'URLs, une par ligne ('-' pour lire l'entrée standard)",
     )
     p.add_argument(
-        "-m", "--music", action="store_true", help="Télécharger en MP3 et importer dans Apple Music / iTunes"
+        "--links",
+        action="store_true",
+        help="Lister les liens d'une chaîne/playlist sur la sortie standard, sans télécharger",
     )
-    p.add_argument("--list-sites", action="store_true", help="Afficher les sites supportés par yt-dlp")
-    p.add_argument("--history", action="store_true", help="Afficher l'historique des téléchargements")
-    p.add_argument("--update", action="store_true", help="Mettre à jour vdl")
-    p.add_argument("--verbose", action="store_true", help="Afficher les logs de débogage")
-    p.add_argument("--version", action="version", version=f"vdl {__version__}")
+    p.add_argument("-m", "--music", action="store_true", help="Télécharger en MP3 et importer dans Apple Music")
+
+    meta = p.add_argument_group("autres")
+    meta.add_argument("--history", action="store_true", help="Afficher l'historique")
+    meta.add_argument("--list-sites", action="store_true", help="Sites supportés par yt-dlp")
+    meta.add_argument("--update", action="store_true", help="Mettre à jour vdl")
+    meta.add_argument("--verbose", action="store_true", help="Logs de débogage")
+    meta.add_argument("--version", action="version", version=f"vdl {__version__}")
     return p
 
 
@@ -112,7 +104,8 @@ def _validate_url(url: str) -> str | None:
 
 
 def _read_batch_file(path: str) -> list[str]:
-    lines = Path(path).read_text(encoding="utf-8").splitlines()
+    text = sys.stdin.read() if path == "-" else Path(path).read_text(encoding="utf-8")
+    lines = text.splitlines()
     return [line.strip() for line in lines if line.strip() and not line.strip().startswith("#")]
 
 
@@ -130,11 +123,11 @@ def _build_downloader(args: argparse.Namespace, cfg: VdlConfig) -> Downloader:
     return Downloader(
         output_dir=args.output or cfg.output_dir,
         playlist=args.playlist,
-        embed_thumbnail=False if args.no_thumbnail else cfg.embed_thumbnail,
-        sponsorblock=args.sponsorblock or cfg.sponsorblock,
-        subs=args.subs or cfg.subs,
-        subs_lang=args.subs_lang or cfg.subs_lang,
-        output_template=args.output_template or cfg.output_template,
+        embed_thumbnail=cfg.embed_thumbnail,
+        sponsorblock=cfg.sponsorblock,
+        subs=cfg.subs,
+        subs_lang=cfg.subs_lang,
+        output_template=cfg.output_template,
         retries=cfg.retries,
     )
 
@@ -175,6 +168,24 @@ def main() -> None:
 
     if args.update:
         _do_update()
+        return
+
+    # ── Extraction de liens (chaîne/playlist), sans téléchargement ─────────
+    if args.links:
+        if not args.url:
+            print("Précise une chaîne ou une playlist, ex : vdl @chaine --links", file=sys.stderr)
+            sys.exit(1)
+        from .links import extract_links
+
+        try:
+            urls = extract_links(args.url)
+        except Exception as e:
+            print(f"Erreur d'extraction : {e}", file=sys.stderr)
+            sys.exit(1)
+        if not urls:
+            print("Aucune vidéo trouvée.", file=sys.stderr)
+            sys.exit(1)
+        print("\n".join(urls))
         return
 
     from .config import load_config
@@ -229,9 +240,9 @@ def main() -> None:
         print(err, file=sys.stderr)
         sys.exit(1)
 
-    # Déterminer si c'est de l'audio (--music implique --audio)
+    # Déterminer si c'est de l'audio (--music implique --audio ; un format audio aussi)
     is_audio = args.audio or args.music
-    if not is_audio and not args.video and args.format and args.format.lower() in presets.AUDIO_EXTS:
+    if not is_audio and args.format and args.format.lower() in presets.AUDIO_EXTS:
         is_audio = True
 
     ext = args.format.lower() if args.format else ("mp3" if is_audio else "mp4")
