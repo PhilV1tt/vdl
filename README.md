@@ -55,6 +55,8 @@ vdl
 
 Le programme pose des questions : lien, audio ou vidéo, format, qualité. Rien à mémoriser.
 
+Si tu réponds oui à "Personnaliser", vdl demande en plus un titre, s'il faut retirer toutes les métadonnées, et pour l'audio la pochette et l'artiste/album. Sinon il garde les réglages par défaut.
+
 ### Mode commande
 
 ```bash

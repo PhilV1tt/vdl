@@ -73,8 +73,38 @@ def _banner() -> None:
 # ── Flux téléchargement ────────────────────────────────────────────────────
 
 
+def _ask_options(is_audio: bool) -> dict[str, object]:
+    """Options facultatives : titre, nettoyage metadonnees, pochette, artiste/album."""
+    empty: dict[str, object] = {
+        "title": None,
+        "artist": None,
+        "album": None,
+        "strip_metadata": False,
+        "no_thumbnail": False,
+    }
+    if not confirm(t("customize_ask"), default=False):
+        return empty
+
+    title = (text(t("opt_title")) or "").strip() or None
+    strip = confirm(t("opt_strip_meta"), default=False)
+    no_thumb = confirm(t("opt_no_thumb"), default=False) if is_audio else False
+
+    artist = album = None
+    if is_audio and not strip:
+        artist = (text(t("opt_artist")) or "").strip() or None
+        album = (text(t("opt_album")) or "").strip() or None
+
+    return {
+        "title": title,
+        "artist": artist,
+        "album": album,
+        "strip_metadata": strip,
+        "no_thumbnail": no_thumb,
+    }
+
+
 def _download_flow(url: str) -> int:
-    """Demande Audio ou Vidéo, télécharge, propose Apple Music si audio sur macOS."""
+    """Demande Audio ou Vidéo, options facultatives, télécharge, propose Apple Music si audio sur macOS."""
     type_choice = select(
         t("audio_or_video"),
         choices=[
@@ -91,9 +121,24 @@ def _download_flow(url: str) -> int:
 
     quality_selector, audio_kbps = presets.build_quality_selector(is_audio)
 
+    o = _ask_options(is_audio)
+
     print()
-    dl = Downloader(output_dir=DEFAULT_OUTPUT)
+    dl = Downloader(
+        output_dir=DEFAULT_OUTPUT,
+        embed_thumbnail=not o["no_thumbnail"],
+        strip_metadata=bool(o["strip_metadata"]),
+        custom_title=o["title"],  # type: ignore[arg-type]
+    )
     result = dl.download(url, ext, is_audio, quality_selector, audio_kbps)
+
+    if is_audio and result.exit_code == 0 and result.file_path and not o["strip_metadata"]:
+        tags = {k: v for k, v in (("title", o["title"]), ("artist", o["artist"]), ("album", o["album"])) if v}
+        if tags:
+            from .music import _auto_install_deps, write_tags
+
+            if _auto_install_deps():
+                write_tags(result.file_path, tags)
 
     if is_audio and result.exit_code == 0 and result.file_path and sys.platform == "darwin":
         print()

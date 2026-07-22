@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+import re
 import shutil
+import subprocess
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -56,6 +58,31 @@ def check_deps() -> None:
         sys.exit(1)
 
 
+_BAD_TITLE = re.compile(r'[\\/:*?"<>|%]')
+
+
+def _sanitize_title(title: str) -> str:
+    cleaned = _BAD_TITLE.sub("_", title).strip()
+    return cleaned or "video"
+
+
+def _strip_file_metadata(path: Path) -> None:
+    """Retire metadonnees globales et chapitres du fichier final, remux ffmpeg sans reencodage."""
+    if not path.exists():
+        return
+    tmp = path.with_name(path.stem + ".stripped" + path.suffix)
+    cmd = ["ffmpeg", "-y", "-i", str(path), "-map", "0", "-map_metadata", "-1",
+           "-map_chapters", "-1", "-fflags", "+bitexact", "-c", "copy", str(tmp)]
+    try:
+        done = subprocess.run(cmd, capture_output=True)
+        if done.returncode == 0 and tmp.exists():
+            tmp.replace(path)
+        elif tmp.exists():
+            tmp.unlink()
+    except Exception:
+        pass
+
+
 class Downloader:
     def __init__(
         self,
@@ -67,6 +94,8 @@ class Downloader:
         subs_lang: str = "fr",
         output_template: str = "%(title)s.%(ext)s",
         retries: int = 3,
+        strip_metadata: bool = False,
+        custom_title: str | None = None,
     ) -> None:
         self.output_dir = output_dir
         self.playlist = playlist
@@ -76,6 +105,8 @@ class Downloader:
         self.subs_lang = subs_lang
         self.output_template = output_template
         self.retries = retries
+        self.strip_metadata = strip_metadata
+        self.custom_title = custom_title
 
     def _build_ydl_opts(
         self,
@@ -85,9 +116,12 @@ class Downloader:
         audio_kbps: str,
         progress_hook: Callable[[dict[str, Any]], None],
     ) -> dict[str, Any]:
+        template = self.output_template
+        if self.custom_title:
+            template = _sanitize_title(self.custom_title) + ".%(ext)s"
         opts: dict[str, Any] = {
             "format": quality_selector,
-            "outtmpl": str(Path(self.output_dir) / self.output_template),
+            "outtmpl": str(Path(self.output_dir) / template),
             "progress_hooks": [progress_hook],
             "noplaylist": not self.playlist,
             "quiet": True,
@@ -104,9 +138,10 @@ class Downloader:
                     "preferredcodec": ext,
                     "preferredquality": audio_kbps if ext == "mp3" else "0",
                 },
-                {"key": "FFmpegMetadata"},
             ]
-            if self.embed_thumbnail and ext in _THUMBNAIL_FORMATS:
+            if not self.strip_metadata:
+                opts["postprocessors"].append({"key": "FFmpegMetadata"})
+            if self.embed_thumbnail and not self.strip_metadata and ext in _THUMBNAIL_FORMATS:
                 opts["postprocessors"].append({"key": "EmbedThumbnail"})
                 opts["writethumbnail"] = True
         else:
@@ -188,6 +223,8 @@ class Downloader:
                     ydl.download([url])
 
                 printer.done()
+                if self.strip_metadata:
+                    _strip_file_metadata(final_path)
                 success_flash(t("saved", path=self.output_dir))
                 from .history import log_download
 

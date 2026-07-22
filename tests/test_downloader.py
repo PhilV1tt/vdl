@@ -110,3 +110,64 @@ class TestBuildYdlOpts:
     def test_custom_retries(self):
         dl = make_dl(retries=5)
         assert dl.retries == 5
+
+
+class TestMetadataOptions:
+    def test_strip_metadata_audio_no_metadata_pp(self):
+        dl = make_dl(strip_metadata=True)
+        opts = dl._build_ydl_opts("mp3", True, "bestaudio/best", "320", _dummy_hook)
+        keys = [p["key"] for p in opts["postprocessors"]]
+        assert "FFmpegMetadata" not in keys
+        assert "EmbedThumbnail" not in keys
+
+    def test_default_audio_keeps_metadata_pp(self):
+        dl = make_dl()
+        opts = dl._build_ydl_opts("mp3", True, "bestaudio/best", "320", _dummy_hook)
+        keys = [p["key"] for p in opts["postprocessors"]]
+        assert "FFmpegMetadata" in keys
+
+    def test_strip_file_metadata_remux(self, tmp_path):
+        from pathlib import Path
+        from unittest.mock import patch
+
+        from vdl.downloader import _strip_file_metadata
+
+        f = tmp_path / "clip.mp4"
+        f.write_bytes(b"data")
+
+        def fake_run(cmd, **kwargs):
+            # ffmpeg ecrirait le fichier de sortie : on le simule
+            out = cmd[-1]
+            Path(out).write_bytes(b"clean")
+
+            class R:
+                returncode = 0
+
+            return R()
+
+        with patch("vdl.downloader.subprocess.run", side_effect=fake_run) as run:
+            _strip_file_metadata(f)
+
+        args = run.call_args[0][0]
+        assert "-map_metadata" in args and "-1" in args
+        assert "-map_chapters" in args
+        assert "+bitexact" in args
+        assert f.read_bytes() == b"clean"
+
+    def test_strip_metadata_drops_thumbnail_even_if_enabled(self):
+        dl = make_dl(embed_thumbnail=True, strip_metadata=True)
+        opts = dl._build_ydl_opts("mp3", True, "bestaudio/best", "320", _dummy_hook)
+        assert opts.get("writethumbnail") is not True
+        keys = [p["key"] for p in opts["postprocessors"]]
+        assert "EmbedThumbnail" not in keys
+
+    def test_custom_title_in_outtmpl(self):
+        dl = make_dl(custom_title="Mon Titre")
+        opts = dl._build_ydl_opts("mp4", False, "bestvideo+bestaudio/best", "0", _dummy_hook)
+        assert opts["outtmpl"].endswith("Mon Titre.%(ext)s")
+        assert "%(title)s" not in opts["outtmpl"]
+
+    def test_custom_title_sanitized(self):
+        dl = make_dl(custom_title="a/b:c")
+        opts = dl._build_ydl_opts("mp3", True, "bestaudio/best", "320", _dummy_hook)
+        assert opts["outtmpl"].endswith("a_b_c.%(ext)s")
