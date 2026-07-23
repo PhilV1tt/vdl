@@ -34,8 +34,8 @@ AUDIO_QUALITIES = [
 ]
 
 # Derived from VIDEO_QUALITIES - single source of truth
-_QUALITY_KEYS = ["best", "2160", "1440", "1080", "720", "480", "360"]
-VIDEO_QUALITY_MAP: dict[str, str] = {key: VIDEO_QUALITIES[i]["value"] for i, key in enumerate(_QUALITY_KEYS)}
+QUALITY_KEYS = ["best", "2160", "1440", "1080", "720", "480", "360"]
+VIDEO_QUALITY_MAP: dict[str, str] = {key: VIDEO_QUALITIES[i]["value"] for i, key in enumerate(QUALITY_KEYS)}
 
 AUDIO_EXTS: set[str] = {f["ext"] for f in AUDIO_FORMATS}
 VIDEO_EXTS: set[str] = {f["ext"] for f in VIDEO_FORMATS}

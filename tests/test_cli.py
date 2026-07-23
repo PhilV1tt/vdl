@@ -12,12 +12,19 @@ def test_parser_defaults():
     args = parser.parse_args(["https://example.com"])
     assert args.url == "https://example.com"
     assert args.audio is False
-    assert args.quality == "best"
+    assert args.quality is None  # resolu plus tard par prefs.resolve (explicite > memoire > config > "best")
     assert args.format is None
     assert args.playlist is False
     assert args.verbose is False
     assert args.links is False
     assert args.music is False
+    assert args.section is None
+    assert args.cookies_from_browser is None
+    assert args.live_from_start is None
+    assert args.list_formats is False
+    assert args.format_id is None
+    assert args.subs is None
+    assert args.sponsorblock is None
 
 
 def test_parser_audio_flag():
@@ -73,6 +80,51 @@ def test_parser_batch_stdin():
     parser = _make_parser()
     args = parser.parse_args(["-b", "-"])
     assert args.batch_file == "-"
+
+
+def test_parser_section_repeatable():
+    parser = _make_parser()
+    args = parser.parse_args(["https://example.com", "-s", "00:10-00:20", "-s", "01:00-01:30"])
+    assert args.section == ["00:10-00:20", "01:00-01:30"]
+
+
+def test_parser_cookies_from_browser():
+    parser = _make_parser()
+    args = parser.parse_args(["https://example.com", "--cookies-from-browser", "safari"])
+    assert args.cookies_from_browser == "safari"
+
+
+def test_parser_live_from_start_tristate():
+    parser = _make_parser()
+    assert parser.parse_args(["https://example.com"]).live_from_start is None
+    assert parser.parse_args(["https://example.com", "--live-from-start"]).live_from_start is True
+    assert parser.parse_args(["https://example.com", "--no-live-from-start"]).live_from_start is False
+
+
+def test_parser_sponsorblock_tristate():
+    parser = _make_parser()
+    assert parser.parse_args(["https://example.com"]).sponsorblock is None
+    assert parser.parse_args(["https://example.com", "--sponsorblock"]).sponsorblock is True
+    assert parser.parse_args(["https://example.com", "--no-sponsorblock"]).sponsorblock is False
+
+
+def test_parser_subs_optional_lang():
+    parser = _make_parser()
+    assert parser.parse_args(["https://example.com"]).subs is None
+    assert parser.parse_args(["https://example.com", "--subs"]).subs == ""
+    assert parser.parse_args(["https://example.com", "--subs", "en"]).subs == "en"
+
+
+def test_parser_list_formats_flag():
+    parser = _make_parser()
+    args = parser.parse_args(["https://example.com", "-F"])
+    assert args.list_formats is True
+
+
+def test_parser_format_id():
+    parser = _make_parser()
+    args = parser.parse_args(["https://example.com", "--format-id", "137+140"])
+    assert args.format_id == "137+140"
 
 
 def test_invalid_format_exits(monkeypatch):

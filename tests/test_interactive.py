@@ -1,33 +1,45 @@
-"""Tests du mode interactif (questionary mocké)."""
+"""Tests du mode interactif (questionary + probe mockés)."""
 
 from unittest.mock import patch
 
 import pytest
 
+from vdl.config import VdlConfig
 from vdl.downloader import DownloadResult
-from vdl.interactive import _download_flow, run_interactive
+from vdl.interactive import _download_flow, normalize_input, run_interactive
+
+VIDEO_INFO = {"title": "Test Video", "duration": 120, "live_status": "not_live"}
+LIVE_INFO = {"title": "Live Now", "live_status": "is_live"}
+UPCOMING_INFO = {"title": "Soon", "live_status": "is_upcoming", "release_timestamp": 4102444800}
+PLAYLIST_INFO = {"title": "My Playlist", "entries": [{"url": "a"}, {"url": "b"}]}
 
 
-class TestDownloadFlow:
-    """Tests pour _download_flow avec questionary mocké."""
+@pytest.fixture(autouse=True)
+def _no_real_prefs_or_config(monkeypatch):
+    """Config par défaut, mémoire vide, remember() en no-op : chaque test part d'un état neutre."""
+    monkeypatch.setattr("vdl.interactive.load_config", lambda: VdlConfig())
+    monkeypatch.setattr("vdl.prefs.recall", dict)
+    monkeypatch.setattr("vdl.prefs.remember", lambda *a, **k: None)
 
-    def test_audio_downloads_mp3(self):
+
+class TestNormalizeInput:
+    def test_passthrough_http(self):
+        assert normalize_input("https://youtu.be/x") == "https://youtu.be/x"
+
+    def test_handle_expands(self):
+        assert normalize_input("@QOVESStudio") == "https://www.youtube.com/@QOVESStudio/videos"
+
+
+class TestDownloadFlowVideo:
+    def test_probe_failure_returns_1(self):
+        with patch("vdl.interactive.probe", return_value=None):
+            rc = _download_flow("https://example.com/video")
+        assert rc == 1
+
+    def test_quick_download_uses_video_defaults(self):
         with (
-            patch("vdl.interactive.select", return_value="audio"),
-            patch("vdl.interactive.confirm", return_value=False),
-            patch("vdl.interactive.Downloader") as mock_dl,
-        ):
-            mock_dl.return_value.download.return_value = DownloadResult(0)
-            rc = _download_flow("https://example.com/audio")
-        assert rc == 0
-        call_args = mock_dl.return_value.download.call_args[0]
-        assert call_args[1] == "mp3"  # ext
-        assert call_args[2] is True  # is_audio
-
-    def test_video_downloads_mp4(self):
-        with (
-            patch("vdl.interactive.select", return_value="video"),
-            patch("vdl.interactive.confirm", return_value=False),
+            patch("vdl.interactive.probe", return_value=VIDEO_INFO),
+            patch("vdl.interactive.select", return_value="download"),
             patch("vdl.interactive.Downloader") as mock_dl,
         ):
             mock_dl.return_value.download.return_value = DownloadResult(0)
@@ -37,77 +49,128 @@ class TestDownloadFlow:
         assert call_args[1] == "mp4"  # ext
         assert call_args[2] is False  # is_audio
 
-    def test_cancel_on_type_selection(self):
-        with patch("vdl.interactive.select", return_value=None):
+    def test_audio_instead(self):
+        with (
+            patch("vdl.interactive.probe", return_value=VIDEO_INFO),
+            patch("vdl.interactive.select", return_value="audio"),
+            patch("vdl.interactive.Downloader") as mock_dl,
+        ):
+            mock_dl.return_value.download.return_value = DownloadResult(0)
+            rc = _download_flow("https://example.com/video")
+        assert rc == 0
+        call_args = mock_dl.return_value.download.call_args[0]
+        assert call_args[1] == "mp3"
+        assert call_args[2] is True
+
+    def test_cancel_on_quick_screen(self):
+        with (
+            patch("vdl.interactive.probe", return_value=VIDEO_INFO),
+            patch("vdl.interactive.select", return_value=None),
+        ):
             rc = _download_flow("https://example.com/video")
         assert rc == 0
 
     def test_download_failure_returns_nonzero(self):
         with (
-            patch("vdl.interactive.select", return_value="video"),
-            patch("vdl.interactive.confirm", return_value=False),
+            patch("vdl.interactive.probe", return_value=VIDEO_INFO),
+            patch("vdl.interactive.select", return_value="download"),
             patch("vdl.interactive.Downloader") as mock_dl,
         ):
             mock_dl.return_value.download.return_value = DownloadResult(1)
             rc = _download_flow("https://example.com/video")
         assert rc == 1
 
-    def test_audio_confirms_apple_music_on_macos(self, tmp_path):
-        import sys
 
-        if sys.platform != "darwin":
-            return
-        f = tmp_path / "song.mp3"
-        f.write_bytes(b"")
+class TestOptionsScreen:
+    def test_options_then_back_downloads(self):
         with (
-            patch("vdl.interactive.select", return_value="audio"),
-            patch("vdl.interactive.confirm", side_effect=[False, True]),
-            patch("vdl.interactive.Downloader") as mock_dl,
-            patch("vdl.music.music_pipeline") as mock_pipeline,
-        ):
-            mock_dl.return_value.download.return_value = DownloadResult(0, f, {"title": "Song"})
-            rc = _download_flow("https://example.com/song")
-        assert rc == 0
-        mock_pipeline.assert_called_once()
-
-
-class TestDownloadOptions:
-    def test_strip_metadata_passed_to_downloader(self):
-        with (
-            patch("vdl.interactive.select", return_value="video"),
-            patch("vdl.interactive.confirm", side_effect=[True, True]),
-            patch("vdl.interactive.text", return_value=""),
+            patch("vdl.interactive.probe", return_value=VIDEO_INFO),
+            patch("vdl.interactive.select", side_effect=["options", "back"]),
+            patch("vdl.interactive.confirm", return_value=False),  # "audio ?" -> non
             patch("vdl.interactive.Downloader") as mock_dl,
         ):
             mock_dl.return_value.download.return_value = DownloadResult(0)
             rc = _download_flow("https://example.com/video")
         assert rc == 0
-        assert mock_dl.call_args.kwargs["strip_metadata"] is True
+        assert mock_dl.return_value.download.call_args[0][2] is False
 
-    def test_custom_title_passed_to_downloader(self):
+    def test_custom_title_via_metadata_row(self):
         with (
-            patch("vdl.interactive.select", return_value="video"),
-            patch("vdl.interactive.confirm", side_effect=[True, False]),
-            patch("vdl.interactive.text", return_value="Ma Video"),
+            patch("vdl.interactive.probe", return_value=VIDEO_INFO),
+            patch("vdl.interactive.select", side_effect=["options", "meta", "back"]),
+            patch("vdl.interactive.confirm", side_effect=[False, False]),  # audio ? non ; nettoyer ? non
+            patch("vdl.interactive.text", return_value="Mon Titre"),
             patch("vdl.interactive.Downloader") as mock_dl,
         ):
             mock_dl.return_value.download.return_value = DownloadResult(0)
             rc = _download_flow("https://example.com/video")
         assert rc == 0
-        assert mock_dl.call_args.kwargs["custom_title"] == "Ma Video"
-        assert mock_dl.call_args.kwargs["strip_metadata"] is False
+        assert mock_dl.call_args.kwargs["custom_title"] == "Mon Titre"
 
-    def test_audio_no_thumbnail_passed(self):
+    def test_section_row_passed_to_downloader(self):
         with (
-            patch("vdl.interactive.select", return_value="audio"),
-            patch("vdl.interactive.confirm", side_effect=[True, False, True, False]),
-            patch("vdl.interactive.text", return_value=""),
+            patch("vdl.interactive.probe", return_value=VIDEO_INFO),
+            patch("vdl.interactive.select", side_effect=["options", "section", "back"]),
+            patch("vdl.interactive.confirm", return_value=False),  # audio ?
+            patch("vdl.interactive.text", return_value="00:10-00:20"),
             patch("vdl.interactive.Downloader") as mock_dl,
         ):
             mock_dl.return_value.download.return_value = DownloadResult(0)
-            rc = _download_flow("https://example.com/audio")
+            rc = _download_flow("https://example.com/video")
         assert rc == 0
-        assert mock_dl.call_args.kwargs["embed_thumbnail"] is False
+        assert mock_dl.call_args.kwargs["sections"] == ["00:10-00:20"]
+
+
+class TestPlaylistFlow:
+    def test_whole_playlist(self):
+        with (
+            patch("vdl.interactive.probe", return_value=PLAYLIST_INFO),
+            patch("vdl.interactive.select", return_value="all"),
+            patch("vdl.interactive.confirm", return_value=False),  # audio ?
+            patch("vdl.interactive.Downloader") as mock_dl,
+        ):
+            mock_dl.return_value.download.return_value = DownloadResult(0)
+            rc = _download_flow("https://www.youtube.com/playlist?list=PL123")
+        assert rc == 0
+        assert mock_dl.call_args.kwargs["playlist"] is True
+
+    def test_single_video_within_combined_url(self):
+        combined_url = "https://www.youtube.com/watch?v=abc&list=PL123"
+        with (
+            patch("vdl.interactive.probe", side_effect=[PLAYLIST_INFO, VIDEO_INFO]),
+            patch("vdl.interactive.select", side_effect=["one", "download"]),
+            patch("vdl.interactive.Downloader") as mock_dl,
+        ):
+            mock_dl.return_value.download.return_value = DownloadResult(0)
+            rc = _download_flow(combined_url)
+        assert rc == 0
+
+    def test_back_cancels(self):
+        with (
+            patch("vdl.interactive.probe", return_value=PLAYLIST_INFO),
+            patch("vdl.interactive.select", return_value="back"),
+        ):
+            rc = _download_flow("https://www.youtube.com/playlist?list=PL123")
+        assert rc == 0
+
+
+class TestLiveFlow:
+    def test_live_quick_screen_records_from_start(self):
+        with (
+            patch("vdl.interactive.probe", return_value=LIVE_INFO),
+            patch("vdl.interactive.select", return_value="download"),
+            patch("vdl.interactive.Downloader") as mock_dl,
+        ):
+            mock_dl.return_value.download.return_value = DownloadResult(0)
+            rc = _download_flow("https://www.youtube.com/watch?v=live123")
+        assert rc == 0
+        assert mock_dl.return_value.download.call_args.kwargs["info"] is LIVE_INFO
+
+    def test_upcoming_short_circuits_without_download(self, capsys):
+        with patch("vdl.interactive.probe", return_value=UPCOMING_INFO):
+            rc = _download_flow("https://www.youtube.com/watch?v=soon")
+        assert rc == 0
+        assert capsys.readouterr().out.strip() != ""
 
 
 class TestRunInteractive:
@@ -130,14 +193,26 @@ class TestRunInteractive:
             run_interactive()
         assert exc.value.code == 0
 
-    def test_invalid_url_loops_back(self):
+    def test_download_then_empty_queue_returns_to_menu(self):
         with (
             patch("vdl.interactive.select", side_effect=["download", "quit"]),
-            patch("vdl.interactive.text", return_value="not-a-url"),
+            patch("vdl.interactive.text", side_effect=["https://example.com/video", ""]),
+            patch("vdl.interactive._download_flow", return_value=0) as mock_flow,
             pytest.raises(SystemExit) as exc,
         ):
             run_interactive()
         assert exc.value.code == 0
+        mock_flow.assert_called_once_with("https://example.com/video")
+
+    def test_queue_downloads_a_second_link(self):
+        with (
+            patch("vdl.interactive.select", side_effect=["download", "quit"]),
+            patch("vdl.interactive.text", side_effect=["https://example.com/1", "https://example.com/2", ""]),
+            patch("vdl.interactive._download_flow", return_value=0) as mock_flow,
+            pytest.raises(SystemExit),
+        ):
+            run_interactive()
+        assert mock_flow.call_count == 2
 
     def test_history_action(self):
         with (
@@ -147,20 +222,6 @@ class TestRunInteractive:
         ):
             run_interactive()
         mock_hist.assert_called_once()
-
-    def test_download_then_returns_to_menu(self):
-        """Après un téléchargement, on revient au menu."""
-        url = "https://example.com/video"
-        with (
-            patch("vdl.interactive.select", side_effect=["download", "video", "quit"]),
-            patch("vdl.interactive.text", return_value=url),
-            patch("vdl.interactive.confirm", return_value=False),
-            patch("vdl.interactive.Downloader") as mock_dl,
-            pytest.raises(SystemExit) as exc,
-        ):
-            mock_dl.return_value.download.return_value = DownloadResult(0)
-            run_interactive()
-        assert exc.value.code == 0
 
     def test_search_action(self):
         with (

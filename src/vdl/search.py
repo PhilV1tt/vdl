@@ -72,17 +72,3 @@ def search_videos(query: str, source: str = "youtube", n: int = 10) -> list[dict
             }
         )
     return results
-
-
-def format_result_label(r: dict[str, object], idx: int) -> str:
-    """Formate un résultat pour l'affichage dans le menu."""
-    title = str(r.get("title", "?"))
-    dur = _fmt_duration(r.get("duration"))  # type: ignore[arg-type]
-    uploader = str(r.get("uploader", ""))
-    views = _fmt_views(r.get("view_count"))  # type: ignore[arg-type]
-
-    parts = [f"{idx}. {title}"]
-    meta = "  ".join(filter(None, [dur, uploader, views]))
-    if meta:
-        parts.append(f"   {meta}")
-    return "\n".join(parts)

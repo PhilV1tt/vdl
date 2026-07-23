@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 
-from vdl.links import extract_links, normalize_channel_url
+from vdl.links import extract_links, is_channel_target, normalize_channel_url
 
 
 class TestNormalizeChannelUrl:
@@ -35,6 +35,26 @@ class TestNormalizeChannelUrl:
             normalize_channel_url("https://www.youtube.com/@x/")
             == "https://www.youtube.com/@x/videos"
         )
+
+
+class TestIsChannelTarget:
+    def test_bare_handle(self):
+        assert is_channel_target("@QOVESStudio") is True
+
+    def test_channel_page_without_tab(self):
+        assert is_channel_target("https://www.youtube.com/@QOVESStudio") is True
+
+    def test_watch_url_is_not_channel(self):
+        assert is_channel_target("https://www.youtube.com/watch?v=abc123") is False
+
+    def test_playlist_url_is_not_channel(self):
+        assert is_channel_target("https://www.youtube.com/playlist?list=PL123") is False
+
+    def test_combined_video_and_list_is_not_channel(self):
+        assert is_channel_target("https://www.youtube.com/watch?v=abc&list=PL123") is False
+
+    def test_non_youtube_domain_is_not_channel(self):
+        assert is_channel_target("https://vimeo.com/12345") is False
 
 
 def _fake_ydl(info):

@@ -2,7 +2,7 @@
 
 from unittest.mock import patch
 
-from vdl.search import _fmt_duration, _fmt_views, format_result_label, search_videos
+from vdl.search import _fmt_duration, _fmt_views, search_videos
 
 
 class TestFormatDuration:
@@ -37,19 +37,6 @@ class TestFormatViews:
 
     def test_small(self):
         assert "999" in _fmt_views(999)
-
-
-class TestFormatResultLabel:
-    def test_basic_label(self):
-        result = {"title": "Test Video", "duration": 120, "uploader": "TestUser", "view_count": 1000}
-        label = format_result_label(result, 1)
-        assert "Test Video" in label
-        assert "2:00" in label
-
-    def test_missing_fields(self):
-        result = {"title": "Minimal", "duration": None, "uploader": "", "view_count": None}
-        label = format_result_label(result, 1)
-        assert "Minimal" in label
 
 
 class TestSearchVideos:

@@ -39,6 +39,19 @@ def normalize_channel_url(target: str) -> str:
     return target
 
 
+def is_channel_target(raw: str) -> bool:
+    """True si l'entrée pointe une chaîne/playlist entière plutôt qu'une vidéo précise."""
+    raw = raw.strip()
+    if raw.startswith("@"):
+        return True
+    lower = raw.lower()
+    if "youtube.com" not in lower and "youtu.be" not in lower:
+        return False
+    if "list=" in lower or "watch?v=" in lower or "youtu.be/" in lower:
+        return False
+    return any(marker in lower for marker in _CHANNEL_MARKERS) or any(tab in lower for tab in _YOUTUBE_TABS)
+
+
 def extract_links(target: str) -> list[str]:
     """Retourne toutes les URLs de vidéos d'une chaîne/playlist, sans rien télécharger."""
     import yt_dlp

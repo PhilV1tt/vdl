@@ -50,3 +50,22 @@ def test_progress_printer_done_with_message(capsys):
     pp.done("Terminé")
     captured = capsys.readouterr()
     assert "Terminé" in captured.out
+
+
+def test_update_live_marks_active(capsys):
+    pp = ProgressPrinter()
+    pp.update_live(1024 * 1024, 3, None, 500_000)
+    assert pp._active is True
+    assert "1.0 MiB" in capsys.readouterr().err
+
+
+def test_update_live_shows_fragment_count(capsys):
+    pp = ProgressPrinter()
+    pp.update_live(0, 2, 5, 0)
+    assert "fragment 2/5" in capsys.readouterr().err
+
+
+def test_update_live_no_fragment_index(capsys):
+    pp = ProgressPrinter()
+    pp.update_live(0, None, None, 0)
+    assert "fragment" not in capsys.readouterr().err
