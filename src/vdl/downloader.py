@@ -22,6 +22,7 @@ class DownloadResult:
     file_path: Path | None = None
     info: dict[str, Any] = field(default_factory=dict)
 
+
 DEFAULT_OUTPUT = str(Path.home() / "Downloads")
 
 _ERROR_PATTERNS: list[tuple[str, str]] = [
@@ -72,8 +73,23 @@ def _strip_file_metadata(path: Path) -> None:
     if not path.exists():
         return
     tmp = path.with_name(path.stem + ".stripped" + path.suffix)
-    cmd = ["ffmpeg", "-y", "-i", str(path), "-map", "0", "-map_metadata", "-1",
-           "-map_chapters", "-1", "-fflags", "+bitexact", "-c", "copy", str(tmp)]
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(path),
+        "-map",
+        "0",
+        "-map_metadata",
+        "-1",
+        "-map_chapters",
+        "-1",
+        "-fflags",
+        "+bitexact",
+        "-c",
+        "copy",
+        str(tmp),
+    ]
     try:
         done = subprocess.run(cmd, capture_output=True)
         if done.returncode == 0 and tmp.exists():

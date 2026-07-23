@@ -31,10 +31,7 @@ class TestNormalizeChannelUrl:
         assert normalize_channel_url("youtube.com/@x").startswith("https://")
 
     def test_trailing_slash(self):
-        assert (
-            normalize_channel_url("https://www.youtube.com/@x/")
-            == "https://www.youtube.com/@x/videos"
-        )
+        assert normalize_channel_url("https://www.youtube.com/@x/") == "https://www.youtube.com/@x/videos"
 
 
 class TestIsChannelTarget:

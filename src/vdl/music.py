@@ -12,10 +12,7 @@ from .tui import Spinner, success_flash
 
 
 def _check_deps() -> bool:
-    return (
-        importlib.util.find_spec("mutagen") is not None
-        and importlib.util.find_spec("musicbrainzngs") is not None
-    )
+    return importlib.util.find_spec("mutagen") is not None and importlib.util.find_spec("musicbrainzngs") is not None
 
 
 def _auto_install_deps() -> bool:
