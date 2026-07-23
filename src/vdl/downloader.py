@@ -206,6 +206,8 @@ class Downloader:
         sections: list[str] | None = None,
         cookies_browser: str | None = None,
         format_id: str | None = None,
+        concurrent_fragments: int = 4,
+        use_aria2c: bool = False,
     ) -> None:
         self.output_dir = output_dir
         self.playlist = playlist
@@ -221,6 +223,8 @@ class Downloader:
         self.sections = sections
         self.cookies_browser = cookies_browser
         self.format_id = format_id
+        self.concurrent_fragments = concurrent_fragments
+        self.use_aria2c = use_aria2c
 
     def _build_ydl_opts(
         self,
@@ -240,7 +244,12 @@ class Downloader:
             "noplaylist": not self.playlist,
             "quiet": True,
             "no_warnings": True,
+            "concurrent_fragment_downloads": self.concurrent_fragments,
         }
+
+        if self.use_aria2c:
+            opts["external_downloader"] = {"default": "aria2c"}
+            opts["external_downloader_args"] = {"aria2c": ["-x", "16", "-s", "16", "-k", "1M"]}
 
         if self.cookies_browser:
             opts["cookiesfrombrowser"] = (self.cookies_browser,)

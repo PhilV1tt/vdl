@@ -17,6 +17,8 @@ class VdlConfig:
     output_template: str = "%(title)s.%(ext)s"
     retries: int = 3
     music: bool = False
+    concurrent_fragments: int = 4
+    aria2c: bool = False
     _extra: dict[str, object] = field(default_factory=dict, repr=False)
 
 
@@ -33,6 +35,8 @@ _CONVERTERS: dict[str, object] = {
     "output_template": str,
     "retries": lambda v: int(str(v)),
     "music": bool,
+    "concurrent_fragments": lambda v: int(str(v)),
+    "aria2c": bool,
 }
 
 

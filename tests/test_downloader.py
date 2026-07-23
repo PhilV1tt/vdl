@@ -215,6 +215,27 @@ class TestNewOrthogonalOptions:
         opts = dl._build_ydl_opts("mp4", False, "bestvideo+bestaudio/best", "0", _dummy_hook)
         assert "download_ranges" not in opts
 
+    def test_concurrent_fragments_default(self):
+        dl = make_dl()
+        opts = dl._build_ydl_opts("mp4", False, "bestvideo+bestaudio/best", "0", _dummy_hook)
+        assert opts["concurrent_fragment_downloads"] == 4
+
+    def test_concurrent_fragments_custom(self):
+        dl = make_dl(concurrent_fragments=8)
+        opts = dl._build_ydl_opts("mp4", False, "bestvideo+bestaudio/best", "0", _dummy_hook)
+        assert opts["concurrent_fragment_downloads"] == 8
+
+    def test_aria2c_off_by_default(self):
+        dl = make_dl()
+        opts = dl._build_ydl_opts("mp4", False, "bestvideo+bestaudio/best", "0", _dummy_hook)
+        assert "external_downloader" not in opts
+
+    def test_aria2c_enabled(self):
+        dl = make_dl(use_aria2c=True)
+        opts = dl._build_ydl_opts("mp4", False, "bestvideo+bestaudio/best", "0", _dummy_hook)
+        assert opts["external_downloader"] == {"default": "aria2c"}
+        assert opts["external_downloader_args"]["aria2c"] == ["-x", "16", "-s", "16", "-k", "1M"]
+
 
 class TestParseSection:
     def test_mmss_range(self):

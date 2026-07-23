@@ -210,6 +210,8 @@ def _build_downloader(
         sections=args.section,
         cookies_browser=args.cookies_from_browser,
         format_id=args.format_id,
+        concurrent_fragments=cfg.concurrent_fragments,
+        use_aria2c=cfg.aria2c,
     )
 
 

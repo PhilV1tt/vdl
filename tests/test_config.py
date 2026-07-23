@@ -26,6 +26,12 @@ class TestVdlConfigDefaults:
     def test_default_retries(self):
         assert VdlConfig().retries == 3
 
+    def test_default_concurrent_fragments(self):
+        assert VdlConfig().concurrent_fragments == 4
+
+    def test_default_aria2c_off(self):
+        assert VdlConfig().aria2c is False
+
 
 class TestLoadConfig:
     def test_no_config_file_returns_defaults(self, tmp_path: Path):
@@ -62,6 +68,18 @@ class TestLoadConfig:
         config_file.write_text("retries = 5\n")
         cfg = load_config(config_file)
         assert cfg.retries == 5
+
+    def test_config_concurrent_fragments(self, tmp_path: Path):
+        config_file = tmp_path / "config.toml"
+        config_file.write_text("concurrent_fragments = 8\n")
+        cfg = load_config(config_file)
+        assert cfg.concurrent_fragments == 8
+
+    def test_config_aria2c_true(self, tmp_path: Path):
+        config_file = tmp_path / "config.toml"
+        config_file.write_text("aria2c = true\n")
+        cfg = load_config(config_file)
+        assert cfg.aria2c is True
 
     def test_unknown_keys_ignored(self, tmp_path: Path):
         config_file = tmp_path / "config.toml"

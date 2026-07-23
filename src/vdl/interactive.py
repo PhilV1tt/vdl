@@ -127,6 +127,8 @@ def _default_options(is_audio: bool, state: dict[str, Any], cfg: Any) -> dict[st
         "strip_metadata": False,
         "no_thumbnail": False,
         "cookies_browser": None,
+        "concurrent_fragments": cfg.concurrent_fragments,
+        "use_aria2c": cfg.aria2c,
     }
 
 
@@ -204,6 +206,8 @@ def _run_download(url: str, is_audio: bool, o: dict[str, object], info: dict[str
         custom_title=o["title"],  # type: ignore[arg-type]
         sections=[str(o["section"])] if o["section"] else None,
         cookies_browser=o["cookies_browser"],  # type: ignore[arg-type]
+        concurrent_fragments=int(o["concurrent_fragments"]),  # type: ignore[call-overload]
+        use_aria2c=bool(o["use_aria2c"]),
     )
     print()
     result = dl.download(url, str(o["ext"]), is_audio, quality_selector, audio_kbps, info=info)
@@ -259,7 +263,13 @@ def _playlist_flow(url: str, info: dict[str, Any], state: dict[str, Any], cfg: A
     o = _default_options(is_audio, state, cfg)
     print()
     quality_selector, audio_kbps = presets.build_quality_selector(is_audio, str(o["quality"]))
-    dl = Downloader(output_dir=str(o["output_dir"]), playlist=True, embed_thumbnail=not o["no_thumbnail"])
+    dl = Downloader(
+        output_dir=str(o["output_dir"]),
+        playlist=True,
+        embed_thumbnail=not o["no_thumbnail"],
+        concurrent_fragments=int(o["concurrent_fragments"]),  # type: ignore[call-overload]
+        use_aria2c=bool(o["use_aria2c"]),
+    )
     result = dl.download(url, str(o["ext"]), is_audio, quality_selector, audio_kbps)
     if result.exit_code == 0:
         prefs.remember(is_audio, quality=str(o["quality"]), fmt=str(o["ext"]), output=str(o["output_dir"]))

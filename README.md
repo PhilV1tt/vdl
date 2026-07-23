@@ -125,7 +125,14 @@ subs_lang = "fr"         # Langue des sous-titres
 sponsorblock = true      # Supprimer les segments SponsorBlock
 embed_thumbnail = true   # Embarquer la miniature
 output_template = "%(title)s.%(ext)s"
+concurrent_fragments = 4 # Fragments telechargés en parallèle (vidéos/lives longs)
+aria2c = false           # Déléguer le téléchargement à aria2c (brew install aria2)
 ```
+
+Sur les vidéos longues et les lives, vdl télécharge déjà 4 fragments en parallèle
+par défaut (plus rapide qu'un fragment à la fois). Pour aller plus loin, installe
+`aria2c` et passe `aria2c = true` : yt-dlp lui délègue le téléchargement, généralement
+le plus rapide.
 
 ## Mise à jour
 
