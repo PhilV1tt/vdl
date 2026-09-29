@@ -6,7 +6,7 @@ import pytest
 
 from vdl.config import VdlConfig
 from vdl.downloader import DownloadResult
-from vdl.interactive import _download_flow, normalize_input, run_interactive
+from vdl.interactive import _convert_flow, _download_flow, normalize_input, run_interactive
 
 VIDEO_INFO = {"title": "Test Video", "duration": 120, "live_status": "not_live"}
 LIVE_INFO = {"title": "Live Now", "live_status": "is_live"}
@@ -173,6 +173,49 @@ class TestLiveFlow:
         assert capsys.readouterr().out.strip() != ""
 
 
+class TestConvertFlow:
+    def test_audio_conversion(self):
+        from vdl.i18n import t
+
+        with (
+            patch("vdl.interactive.text", return_value=" /tmp/film.mkv "),
+            patch("vdl.interactive.select", side_effect=[t("opt_audio"), "MP3", "320 kbps (max)"]),
+            patch("vdl.convert.convert_files", return_value=0) as cf,
+        ):
+            _convert_flow()
+        assert cf.call_args[0] == (["/tmp/film.mkv"], "mp3", "320", None)
+
+    def test_video_conversion_picks_a_height_not_a_selector(self):
+        from vdl.i18n import t
+
+        with (
+            patch("vdl.interactive.text", return_value="/tmp/film.mkv"),
+            patch("vdl.interactive.select", side_effect=[t("opt_video"), "MP4", "1080p"]),
+            patch("vdl.convert.convert_files", return_value=0) as cf,
+        ):
+            _convert_flow()
+        assert cf.call_args[0] == (["/tmp/film.mkv"], "mp4", "1080", None)
+
+    def test_empty_path_converts_nothing(self):
+        with (
+            patch("vdl.interactive.text", return_value="  "),
+            patch("vdl.convert.convert_files") as cf,
+        ):
+            _convert_flow()
+        cf.assert_not_called()
+
+    def test_cancel_on_format_converts_nothing(self):
+        from vdl.i18n import t
+
+        with (
+            patch("vdl.interactive.text", return_value="/tmp/film.mkv"),
+            patch("vdl.interactive.select", side_effect=[t("opt_audio"), None]),
+            patch("vdl.convert.convert_files") as cf,
+        ):
+            _convert_flow()
+        cf.assert_not_called()
+
+
 class TestRunInteractive:
     def test_quit_action_exits_0(self):
         with patch("vdl.interactive.select", return_value="quit"), pytest.raises(SystemExit) as exc:
@@ -231,6 +274,15 @@ class TestRunInteractive:
         ):
             run_interactive()
         mock_search.assert_called_once()
+
+    def test_convert_action(self):
+        with (
+            patch("vdl.interactive.select", side_effect=["convert", "quit"]),
+            patch("vdl.interactive._convert_flow") as mock_convert,
+            pytest.raises(SystemExit),
+        ):
+            run_interactive()
+        mock_convert.assert_called_once()
 
 
 class TestTuiModule:

@@ -398,6 +398,34 @@ def _history_flow() -> None:
     show_history()
 
 
+def _convert_flow() -> None:
+    """Convertit un fichier local : chemin -> audio/video -> format -> qualite."""
+    from . import presets
+    from .convert import convert_files
+
+    path = text(t("convert_prompt_file"))
+    if not path or not path.strip():
+        return
+
+    is_audio = select(t("audio_or_video"), choices=[t("opt_audio"), t("opt_video")]) == t("opt_audio")
+    table = presets.AUDIO_FORMATS if is_audio else presets.VIDEO_FORMATS
+    ext = select(t("audio_format") if is_audio else t("video_format"), choices=[f["label"] for f in table])
+    if not ext:
+        return
+    picked_ext = next(f["ext"] for f in table if f["label"] == ext)
+
+    rows = presets.AUDIO_QUALITIES if is_audio else presets.VIDEO_QUALITIES
+    picked_q = select(t("audio_quality") if is_audio else t("video_quality"), choices=[q["label"] for q in rows])
+    if not picked_q:
+        return
+    index = [q["label"] for q in rows].index(picked_q)
+    # côté vidéo la qualité est une hauteur (1080), pas le sélecteur yt-dlp
+    quality = rows[index]["value"] if is_audio else presets.QUALITY_KEYS[index]
+
+    print()
+    convert_files([path.strip()], picked_ext, str(quality), None)
+
+
 # ── Point d'entrée principal ───────────────────────────────────────────────
 
 
@@ -411,6 +439,7 @@ def run_interactive() -> None:
             choices=[
                 {"name": t("menu_download"), "value": "download"},
                 {"name": t("menu_search"), "value": "search"},
+                {"name": t("menu_convert"), "value": "convert"},
                 {"name": t("menu_history"), "value": "history"},
                 {"name": t("menu_quit"), "value": "quit"},
             ],
@@ -446,6 +475,12 @@ def run_interactive() -> None:
 
         elif action == "history":
             _history_flow()
+            print()
+            animate_separator()
+            print()
+
+        elif action == "convert":
+            _convert_flow()
             print()
             animate_separator()
             print()

@@ -55,6 +55,8 @@ vdl
 
 Colle un lien, vdl propose direct "Télécharger" avec la qualité et le format que tu as choisis la dernière fois. Entrée suffit. "Plutôt l'audio" bascule en un coup, et "Options…" ouvre qualité, format, dossier, extrait, sous-titres, SponsorBlock, métadonnées et cookies navigateur pour qui veut aller plus loin.
 
+Le menu a aussi "Convertir un fichier local" (voir plus bas).
+
 Sur une chaîne ou une playlist, vdl demande "toute la playlist" ou juste la vidéo précise. Sur un live en cours, il enregistre depuis le début (Ctrl-C pour arrêter à l'instant présent).
 
 ### Mode commande
@@ -66,9 +68,33 @@ vdl https://youtu.be/xxx -a -f flac        # Audio FLAC
 vdl https://youtu.be/xxx -q 1080           # Vidéo 1080p
 vdl -m https://youtu.be/xxx                # MP3 + import Apple Music
 vdl -b liens.txt                           # Télécharger une liste d'URLs
+vdl convert film.mkv -f mp3                # Convertir un fichier local
 vdl https://youtu.be/xxx -s 12:00-14:30    # Juste cet extrait
 vdl <live YouTube en cours>                # Enregistre depuis le début du live
 ```
+
+### Convertir un fichier local
+
+`convert` transforme un fichier déjà sur le disque, sans passer par un site. La sortie
+porte le nom de la source ; `-o` change le dossier.
+
+```bash
+vdl convert film.mkv -f mp3             # MP3 320 kbps
+vdl convert podcast.wav -f flac         # FLAC, sans perte
+vdl convert reel.mov -f mp4 -q 1080     # MP4 ramené à 1080p
+vdl convert *.mp4 -f mp3 -o ~/Music     # plusieurs fichiers d'un coup
+```
+
+| Option | Description |
+|--------|-------------|
+| `-f FORMAT` | Sortie : `mp3` `m4a` `aac` `flac` `wav` `ogg` `opus` (vidéo : `mp4` `mkv` `webm` `avi` `mov`) |
+| `-q Q` | Audio : `320` `256` `192` `128` kbps.  Vidéo : hauteur `2160` `1440` `1080` `720` `480` `360` |
+| `-o DOSSIER` | Dossier de sortie (défaut : à côté de la source) |
+
+Sans `-f`, la sortie est le dernier format audio choisi, ou MP3. L'encodage est h264 + AAC,
+VP9 + Opus pour WebM. Un fichier de même nom déjà présent est écrasé.
+
+Le menu interactif a aussi l'entrée « Convertir un fichier local ».
 
 ### Options
 

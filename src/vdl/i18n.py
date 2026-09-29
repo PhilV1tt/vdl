@@ -23,6 +23,7 @@ _S: dict[str, dict[str, str]] = {
         "menu_prompt": "Que veux-tu faire ?",
         "menu_download": "Telecharger depuis une URL",
         "menu_search": "Rechercher sur YouTube / SoundCloud",
+        "menu_convert": "Convertir un fichier local",
         "menu_history": "Historique",
         "menu_quit": "Quitter",
         # Download flow
@@ -114,6 +115,12 @@ _S: dict[str, dict[str, str]] = {
         "update_now": "Mettre a jour maintenant ?",
         # Search views
         "views": "vues",
+        # Convertisseur local
+        "convert_prompt_file": "Fichier a convertir :",
+        "err_no_file": "Fichier introuvable : {name}",
+        "err_convert": "Conversion echouee : {msg}",
+        "err_format": "Format inconnu : {fmt}. Formats supportes : {formats}",
+        "err_quality": "Qualite inconnue : {q}. Valeurs : {values}",
         # Music pipeline
         "opt_music": "Apple Music",
         "music_lookup": "Recherche sur MusicBrainz...",
@@ -136,6 +143,7 @@ _S: dict[str, dict[str, str]] = {
         "menu_prompt": "What do you want to do?",
         "menu_download": "Download from a URL",
         "menu_search": "Search on YouTube / SoundCloud",
+        "menu_convert": "Convert a local file",
         "menu_history": "History",
         "menu_quit": "Quit",
         # Download flow
@@ -227,6 +235,12 @@ _S: dict[str, dict[str, str]] = {
         "update_now": "Update now?",
         # Search views
         "views": "views",
+        # Local converter
+        "convert_prompt_file": "File to convert:",
+        "err_no_file": "File not found: {name}",
+        "err_convert": "Conversion failed: {msg}",
+        "err_format": "Unknown format: {fmt}. Supported formats: {formats}",
+        "err_quality": "Unknown quality: {q}. Values: {values}",
         # Music pipeline
         "opt_music": "Apple Music",
         "music_lookup": "Looking up on MusicBrainz...",

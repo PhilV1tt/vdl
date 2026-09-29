@@ -27,6 +27,7 @@ Exemples :
   vdl @QOVESStudio --links | vdl -b -   liste puis télécharge toute la chaîne
   vdl -b liens.txt                      télécharger une liste d'URLs
   vdl -m https://youtu.be/xxx           MP3 + import Apple Music
+  vdl convert film.mkv -f mp3           convertir un fichier local (mp3, flac, 1080p…)
   vdl search "lofi hip hop"             rechercher sur YouTube
   vdl config                            préférences effectives et leur origine
   vdl                                   mode interactif (flèches)
@@ -230,6 +231,10 @@ def main() -> None:
     if raw_args and raw_args[0] == "config":
         _run_config(raw_args[1:])
         return
+    if raw_args and raw_args[0] == "convert":
+        from .convert import run_convert
+
+        sys.exit(run_convert(raw_args[1:]))
 
     # ── Détection mise à jour (background) ────────────────────────────────
     from .updater import start_update_check
