@@ -334,10 +334,16 @@ class TestListFormats:
 
 
 class TestLiveDownload:
-    def test_probe_info_reused_without_reextract(self):
+    def test_probe_info_never_used_for_download(self):
+        """Le probe vient d'une autre instance YoutubeDL : ses URLs donnent un 403.
+
+        L'info qui sert au telechargement doit toujours etre reextraite ici.
+        """
+        probe_info = {"title": "Probe", "live_status": "not_live"}
         with patch("yt_dlp.YoutubeDL") as mock_cls:
             ydl = mock_cls.return_value.__enter__.return_value
             ydl.prepare_filename.return_value = "/tmp/vdl_test/Video.mp4"
+            ydl.extract_info.return_value = {"title": "Video", "live_status": "not_live"}
             ydl.process_ie_result.return_value = {"title": "Video"}
             dl = make_dl()
             result = dl.download(
@@ -346,10 +352,11 @@ class TestLiveDownload:
                 False,
                 "bestvideo+bestaudio/best",
                 "0",
-                info={"title": "Video", "live_status": "not_live"},
+                info=probe_info,
             )
         assert result.exit_code == 0
-        ydl.extract_info.assert_not_called()
+        ydl.extract_info.assert_called_once_with("https://example.com/video", download=False)
+        assert ydl.process_ie_result.call_args[0][0] is not probe_info
 
     def test_is_live_sets_live_from_start_and_reextracts(self):
         with patch("yt_dlp.YoutubeDL") as mock_cls:

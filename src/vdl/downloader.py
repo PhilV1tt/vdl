@@ -309,6 +309,7 @@ class Downloader:
         audio_kbps: str = "320",
         info: dict[str, Any] | None = None,
     ) -> DownloadResult:
+        """`info` sert uniquement a afficher le titre tout de suite (voir plus bas)."""
         import time
 
         import yt_dlp
@@ -316,7 +317,12 @@ class Downloader:
         from .progress import ProgressPrinter
 
         printer = ProgressPrinter()
-        probe_info = info
+        # Un probe vient d'une autre instance YoutubeDL. Ses URLs de format sont liees a
+        # cette session-la (visitor data, nsig, po_token) et YouTube les refuse en 403 des
+        # qu'on telecharge depuis une autre instance. On ne garde donc que le titre ;
+        # l'info qui sert au telechargement est toujours reextraite ci-dessous.
+        if info:
+            printer.title = str(info.get("title") or "")
         final_path: Path | None = None
         title = ""
         is_live = False
@@ -346,11 +352,7 @@ class Downloader:
             try:
                 logger.info("Recuperation des infos pour %s", url)
                 with Spinner(t("fetching")), yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    if probe_info is not None:
-                        current_info = probe_info
-                        probe_info = None  # ne reutiliser le probe qu'une fois ; les reessais refetchent
-                    else:
-                        current_info = ydl.extract_info(url, download=False)
+                    current_info = ydl.extract_info(url, download=False)
                     if current_info is None:
                         return DownloadResult(1)
 
