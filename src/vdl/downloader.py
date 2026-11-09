@@ -137,16 +137,21 @@ def _parse_section(spec: str) -> tuple[float, float]:
     return _parse_timestamp(start_s), _parse_timestamp(end_s)
 
 
-def probe(url: str, *, single: bool = False) -> dict[str, Any] | None:
+def probe(url: str, *, single: bool = True) -> dict[str, Any] | None:
     """Extraction legere : dict complet pour une video seule, entrees a plat pour une playlist/chaine.
 
-    single=True force noplaylist (utile pour cibler la video precise d'une URL video+playlist).
+    A video link targets that video even when YouTube appends a radio or playlist.
     """
     import yt_dlp
 
-    opts: dict[str, Any] = {"extract_flat": "in_playlist", "quiet": True, "no_warnings": True}
-    if single:
-        opts["noplaylist"] = True
+    opts: dict[str, Any] = {
+        "extract_flat": "in_playlist",
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": single,
+        "socket_timeout": 10,
+        "extractor_retries": 1,
+    }
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             result: dict[str, Any] | None = ydl.extract_info(url, download=False)
@@ -338,7 +343,7 @@ class Downloader:
                 downloaded = d.get("downloaded_bytes", 0)
                 speed = d.get("speed") or 0
                 if total:
-                    printer.update(downloaded / total * 85, speed, d.get("eta") or 0)
+                    printer.update(downloaded / total * 100, speed, d.get("eta") or 0)
                 else:
                     printer.update_live(downloaded, d.get("fragment_index"), d.get("fragment_count"), speed)
             elif d["status"] == "finished":

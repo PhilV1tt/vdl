@@ -150,13 +150,13 @@ class TestConvertOne:
         src = tmp_path / "in.mkv"
         src.write_bytes(b"\x00")
         dst = tmp_path / "out.mp3"
-        dst.write_bytes(b"partial")
         done = MagicMock(
             returncode=1, stderr="[mp4 @ 0x1] moov atom not found\nInvalid data found when processing input\n"
         )
         with patch("vdl.convert.subprocess.run", return_value=done), pytest.raises(RuntimeError, match="Invalid data"):
             convert_one(src, dst, "mp3", "320")
         assert not dst.exists()
+        assert list(tmp_path.glob(".vdl-*")) == []  # temp folder cleaned up
 
     def test_success_without_output_counts_as_failure(self, tmp_path):
         src = tmp_path / "in.mkv"
@@ -171,10 +171,20 @@ class TestConvertOne:
         src = tmp_path / "in.mkv"
         src.write_bytes(b"\x00")
         dst = tmp_path / "out.mp3"
-        dst.write_bytes(b"partial")
         with patch("vdl.convert.subprocess.run", side_effect=KeyboardInterrupt), pytest.raises(KeyboardInterrupt):
             convert_one(src, dst, "mp3", "320")
         assert not dst.exists()
+        assert list(tmp_path.glob(".vdl-*")) == []
+
+    def test_existing_output_is_kept_and_refused(self, tmp_path):
+        src = tmp_path / "in.mkv"
+        src.write_bytes(b"\x00")
+        dst = tmp_path / "out.mp3"
+        dst.write_bytes(b"existing")
+        with patch("vdl.convert.subprocess.run") as run, pytest.raises(RuntimeError, match="existe déjà"):
+            convert_one(src, dst, "mp3", "320")
+        run.assert_not_called()
+        assert dst.read_bytes() == b"existing"
 
 
 class TestConvertFiles:

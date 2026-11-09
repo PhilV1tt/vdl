@@ -57,7 +57,7 @@ def test_remember_writes_only_explicit_keys(tmp_path, monkeypatch):
     monkeypatch.setattr(prefs, "STATE_PATH", tmp_path / "state.json")
     prefs.remember(False, quality="720", fmt=None, output=None)
     state = prefs.recall()
-    assert state == {"quality": "720"}
+    assert state == {"mode": "video", "video_quality": "720"}
 
 
 def test_remember_noop_when_nothing_explicit(tmp_path, monkeypatch):
@@ -81,7 +81,7 @@ def test_remember_merges_into_existing_state(tmp_path, monkeypatch):
     prefs.remember(False, quality="720")
     prefs.remember(False, output="/tmp/videos")
     state = prefs.recall()
-    assert state["quality"] == "720"
+    assert state["video_quality"] == "720"
     assert state["output"] == "/tmp/videos"
 
 

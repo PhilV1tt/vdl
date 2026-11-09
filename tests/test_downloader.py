@@ -279,11 +279,17 @@ class TestProbe:
             probe("https://example.com", single=True)
         assert mock_cls.call_args[0][0]["noplaylist"] is True
 
-    def test_default_does_not_set_noplaylist(self):
+    def test_default_sets_noplaylist(self):
         with patch("yt_dlp.YoutubeDL") as mock_cls:
             mock_cls.return_value.__enter__.return_value.extract_info.return_value = {}
             probe("https://example.com")
-        assert "noplaylist" not in mock_cls.call_args[0][0]
+        assert mock_cls.call_args[0][0]["noplaylist"] is True
+
+    def test_single_false_keeps_playlist(self):
+        with patch("yt_dlp.YoutubeDL") as mock_cls:
+            mock_cls.return_value.__enter__.return_value.extract_info.return_value = {}
+            probe("https://example.com", single=False)
+        assert mock_cls.call_args[0][0]["noplaylist"] is False
 
 
 class TestPrintUpcoming:

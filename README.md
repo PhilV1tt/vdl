@@ -53,11 +53,23 @@ Lancez simplement :
 vdl
 ```
 
-Colle un lien, vdl propose direct "Télécharger" avec la qualité et le format que tu as choisis la dernière fois. Entrée suffit. "Plutôt l'audio" bascule en un coup, et "Options…" ouvre qualité, format, dossier, extrait, sous-titres, SponsorBlock, métadonnées et cookies navigateur pour qui veut aller plus loin.
+Colle un lien directement : vdl affiche les derniers réglages sur un seul écran.
+Entrée télécharge, `a` lance l'audio, `v` la vidéo. Le dernier mode utilisé est retenu.
+Tab bascule audio/vidéo ; les flèches gauche/droite changent la qualité et haut/bas le format.
+`d` change le dossier, `e` l'extrait, `o` ouvre les options avancées. Échap revient à la saisie du lien.
+Sur Mac, `m` télécharge l'audio puis l'importe dans Apple Music.
+Le mode actif est surligné ; les réglages réagissent aux touches.
+`NO_COLOR=1` désactive les couleurs, `VDL_REDUCED_MOTION=1` désactive les animations.
+Glisse un fichier local dans le Terminal : vdl propose le format de conversion.
+Tape du texte : vdl cherche sur YouTube. Entrée vide ou Ctrl-D quitte.
 
-Le menu a aussi "Convertir un fichier local" (voir plus bas).
+Les commandes `/convert`, `/search`, `/history` et `/quit` sont affichées au démarrage.
+Les options avancées regroupent sous-titres, SponsorBlock, métadonnées et cookies.
 
-Sur une chaîne ou une playlist, vdl demande "toute la playlist" ou juste la vidéo précise. Sur un live en cours, il enregistre depuis le début (Ctrl-C pour arrêter à l'instant présent).
+Un lien vidéo cible cette vidéo, même si YouTube y ajoute une playlist ou une radio.
+Pour tout télécharger, utilise `vdl URL --playlist`. Un lien de playlist seule ou de chaîne
+utilise le même écran de réglages pour la playlist entière. Sur un live en cours, vdl enregistre
+depuis le début (Ctrl-C pour arrêter à l'instant présent).
 
 ### Mode commande
 
@@ -69,6 +81,8 @@ vdl https://youtu.be/xxx -q 1080           # Vidéo 1080p
 vdl -m https://youtu.be/xxx                # MP3 + import Apple Music
 vdl -b liens.txt                           # Télécharger une liste d'URLs
 vdl convert film.mkv -f mp3                # Convertir un fichier local
+vdl film.mov -f mp3                        # Conversion directe, sans sous-commande
+vdl convert                               # Choisir un fichier puis un format
 vdl https://youtu.be/xxx -s 12:00-14:30    # Juste cet extrait
 vdl <live YouTube en cours>                # Enregistre depuis le début du live
 ```
@@ -77,6 +91,8 @@ vdl <live YouTube en cours>                # Enregistre depuis le début du live
 
 `convert` transforme un fichier déjà sur le disque, sans passer par un site. La sortie
 porte le nom de la source ; `-o` change le dossier.
+La sous-commande `convert` est facultative : `vdl film.mkv -f mp3` fonctionne aussi.
+Sans argument, `vdl convert` demande un fichier et son format de sortie.
 
 ```bash
 vdl convert film.mkv -f mp3             # MP3 320 kbps
@@ -92,9 +108,11 @@ vdl convert *.mp4 -f mp3 -o ~/Music     # plusieurs fichiers d'un coup
 | `-o DOSSIER` | Dossier de sortie (défaut : à côté de la source) |
 
 Sans `-f`, la sortie est le dernier format audio choisi, ou MP3. L'encodage est h264 + AAC,
-VP9 + Opus pour WebM. Un fichier de même nom déjà présent est écrasé.
+VP9 + Opus pour WebM. Si le nom de sortie existe, vdl ajoute un suffixe (`film (1).mp3`).
+La source est conservée, y compris pour une conversion vers le même format.
+Un échec ne laisse pas de fichier partiel.
 
-Le menu interactif a aussi l'entrée « Convertir un fichier local ».
+En mode interactif, colle un chemin ou utilise `/convert`.
 
 ### Options
 
@@ -137,10 +155,12 @@ vdl @QOVESStudio --links | vdl -b -         # Tout en une passe
 
 ### Réglages persistants
 
-vdl retient automatiquement la dernière qualité, le dernier format (séparément pour
-l'audio et la vidéo) et le dernier dossier utilisés, pour les proposer par défaut
+vdl retient automatiquement la dernière qualité et le dernier format, séparément pour
+l'audio et la vidéo. Le dossier choisi en mode interactif est également retenu
 la prochaine fois. `vdl config` affiche les valeurs effectives et leur origine
 (mémoire ou config), `vdl config reset` oublie la mémoire.
+
+En ligne de commande, `-o` ne change le dossier que pour cette exécution.
 
 Les options moins courantes se règlent une fois dans `~/.config/vdl/config.toml`
 (au lieu d'un flag à chaque commande) :

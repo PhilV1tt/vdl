@@ -28,6 +28,7 @@ Exemples :
   vdl -b liens.txt                      télécharger une liste d'URLs
   vdl -m https://youtu.be/xxx           MP3 + import Apple Music
   vdl convert film.mkv -f mp3           convertir un fichier local (mp3, flac, 1080p…)
+  vdl film.mov -f mp3                   convertir directement, sans sous-commande
   vdl search "lofi hip hop"             rechercher sur YouTube
   vdl config                            préférences effectives et leur origine
   vdl                                   mode interactif (flèches)
@@ -36,7 +37,8 @@ Réglages avancés (sous-titres, SponsorBlock, miniature, template de nom) :
   ~/.config/vdl/config.toml   —   voir le README.
 """,
     )
-    p.add_argument("url", nargs="?", help="URL, @chaîne, ou 'search' pour rechercher")
+    p.add_argument("url", nargs="?", help="Lien à télécharger ou fichier local à convertir")
+    p.add_argument("files", nargs="*", help="Autres fichiers locaux à convertir")
     p.add_argument("-a", "--audio", action="store_true", help="Extraire l'audio (MP3 par défaut)")
     p.add_argument(
         "-q",
@@ -51,7 +53,7 @@ Réglages avancés (sous-titres, SponsorBlock, miniature, template de nom) :
         metavar="FMT",
         help="mp3 m4a wav flac ogg aac opus  |  mp4 mkv webm avi mov",
     )
-    p.add_argument("-o", "--output", metavar="DOSSIER", help="Dossier de destination (défaut: dernier choix)")
+    p.add_argument("-o", "--output", metavar="DOSSIER", help="Dossier pour cette commande uniquement")
     p.add_argument("-p", "--playlist", action="store_true", help="Autoriser les playlists / chaînes entières")
     p.add_argument(
         "-b",
@@ -160,7 +162,7 @@ def _run_search(query: str) -> None:
     from .interactive import _search_flow
 
     check_deps()
-    sys.exit(_search_flow())
+    sys.exit(_search_flow(query=query, source="youtube" if query else None))
 
 
 def _run_config(rest: list[str]) -> None:
@@ -178,9 +180,18 @@ def _run_config(rest: list[str]) -> None:
     print(f"mémoire   {prefs.STATE_PATH}")
     print()
     rows = [
-        ("quality", state.get("quality"), cfg.default_quality),
-        ("video_format", state.get("video_format"), cfg.default_format or "mp4"),
-        ("audio_format", state.get("audio_format"), cfg.default_format or "mp3"),
+        ("video_quality", state.get("video_quality") or state.get("quality"), cfg.default_quality),
+        ("audio_quality", state.get("audio_quality"), "320"),
+        (
+            "video_format",
+            state.get("video_format"),
+            cfg.default_format if cfg.default_format in presets.VIDEO_EXTS else "mp4",
+        ),
+        (
+            "audio_format",
+            state.get("audio_format"),
+            cfg.default_format if cfg.default_format in presets.AUDIO_EXTS else "mp3",
+        ),
         ("output", state.get("output"), cfg.output_dir),
     ]
     for name, remembered, default in rows:
@@ -232,17 +243,43 @@ def main() -> None:
         _run_config(raw_args[1:])
         return
     if raw_args and raw_args[0] == "convert":
+        if len(raw_args) == 1:
+            from .interactive import _convert_flow
+
+            if not sys.stdin.isatty():
+                _make_parser().error("Indique un fichier : vdl convert film.mov -f mp3")
+            _convert_flow()
+            return
         from .convert import run_convert
 
         sys.exit(run_convert(raw_args[1:]))
 
-    # ── Détection mise à jour (background) ────────────────────────────────
+    parser = _make_parser()
+    args = parser.parse_intermixed_args()
+
+    if args.url:
+        from .convert import is_local_target, run_convert
+
+        if is_local_target(args.url):
+            unsupported = [
+                key
+                for key, value in vars(args).items()
+                if value and key not in {"url", "files", "format", "quality", "output", "audio"}
+            ]
+            if unsupported:
+                parser.error(f"Options réservées au téléchargement : {', '.join(unsupported)}")
+            convert_args = [args.url, *args.files]
+            for flag, value in (("-f", args.format), ("-q", args.quality), ("-o", args.output)):
+                if value:
+                    convert_args.extend([flag, value])
+            sys.exit(run_convert(convert_args))
+    if args.files:
+        parser.error("Pour plusieurs liens, utilise vdl -b liens.txt")
+
     from .updater import start_update_check
 
-    start_update_check(__version__)
-
-    parser = _make_parser()
-    args = parser.parse_args()
+    if not (args.links or args.list_formats):
+        start_update_check(__version__)
 
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG, format="%(levelname)s %(name)s: %(message)s")
@@ -298,17 +335,22 @@ def main() -> None:
     if args.batch_file:
         try:
             urls = _read_batch_file(args.batch_file)
-        except FileNotFoundError:
-            print(f"Fichier introuvable : {args.batch_file}", file=sys.stderr)
+        except OSError as e:
+            print(f"Impossible de lire {args.batch_file} : {e}", file=sys.stderr)
             sys.exit(1)
         if not urls:
             print("Le fichier batch est vide.", file=sys.stderr)
             sys.exit(1)
 
-        is_audio = args.audio
+        is_audio = args.audio or args.music or bool(args.format and args.format.lower() in presets.AUDIO_EXTS)
         state = prefs.recall()
         quality, ext, output_dir = prefs.resolve(args.quality, args.format, args.output, is_audio, state, cfg)
         ext = ext.lower()
+        if ext not in (presets.AUDIO_EXTS if is_audio else presets.VIDEO_EXTS):
+            parser.error(f"Format incompatible : {ext}")
+        valid = [q["value"] for q in presets.AUDIO_QUALITIES] if is_audio else presets.QUALITY_KEYS
+        if quality not in valid:
+            parser.error(f"Qualité inconnue : {quality}. Valeurs : {', '.join(valid)}")
         quality_selector, audio_kbps = presets.build_quality_selector(is_audio, quality)
         dl = _build_downloader(args, cfg, output_dir=output_dir, playlist=args.playlist)
 
@@ -323,16 +365,22 @@ def main() -> None:
             result = dl.download(url, ext, is_audio, quality_selector, audio_kbps)
             if result.exit_code == 0:
                 ok += 1
+                if args.music and result.file_path:
+                    from .music import music_pipeline
+
+                    music_pipeline(result.file_path, result.info)
             else:
                 fail += 1
         if ok:
-            prefs.remember(is_audio, quality=args.quality, fmt=args.format, output=args.output)
+            prefs.remember(is_audio, quality=args.quality, fmt=args.format)
         print(f"\n{ok} reussi(s), {fail} echoue(s)")
         _show_update_notification()
         sys.exit(0 if fail == 0 else 1)
 
     # ── Pas d'URL → mode interactif ────────────────────────────────────────
     if not args.url:
+        if not sys.stdin.isatty() or not sys.stdout.isatty():
+            parser.error("Indique un lien ou un fichier. Pour un flux de liens : vdl -b -")
         from .interactive import run_interactive
 
         run_interactive()
@@ -355,20 +403,24 @@ def main() -> None:
     quality, ext, output_dir = prefs.resolve(args.quality, args.format, args.output, is_audio, state, cfg)
     ext = ext.lower()
 
-    if ext not in presets.ALL_EXTS:
+    if ext not in (presets.AUDIO_EXTS if is_audio else presets.VIDEO_EXTS):
         print(
-            f"Format inconnu : {ext}. Formats supportes : {', '.join(sorted(presets.ALL_EXTS))}",
+            f"Format incompatible : {ext}. Formats supportés : "
+            f"{', '.join(sorted(presets.AUDIO_EXTS if is_audio else presets.VIDEO_EXTS))}",
             file=sys.stderr,
         )
         sys.exit(1)
 
+    valid = [q["value"] for q in presets.AUDIO_QUALITIES] if is_audio else presets.QUALITY_KEYS
+    if quality not in valid:
+        parser.error(f"Qualité inconnue : {quality}. Valeurs : {', '.join(valid)}")
     quality_selector, audio_kbps = presets.build_quality_selector(is_audio, quality)
     channel_mode = is_channel_target(raw_url)
     dl = _build_downloader(args, cfg, output_dir=output_dir, playlist=args.playlist or channel_mode)
     result = dl.download(url, ext, is_audio, quality_selector, audio_kbps)
 
     if result.exit_code == 0:
-        prefs.remember(is_audio, quality=args.quality, fmt=args.format, output=args.output)
+        prefs.remember(is_audio, quality=args.quality, fmt=args.format)
 
     if args.music and result.exit_code == 0 and result.file_path:
         from .music import music_pipeline

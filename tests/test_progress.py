@@ -52,14 +52,16 @@ def test_progress_printer_done_with_message(capsys):
     assert "Terminé" in captured.out
 
 
-def test_update_live_marks_active(capsys):
+def test_update_live_marks_active(capsys, monkeypatch):
+    monkeypatch.setattr("sys.stderr.isatty", lambda: True, raising=False)
     pp = ProgressPrinter()
     pp.update_live(1024 * 1024, 3, None, 500_000)
     assert pp._active is True
     assert "1.0 MiB" in capsys.readouterr().err
 
 
-def test_update_live_shows_fragment_count(capsys):
+def test_update_live_shows_fragment_count(capsys, monkeypatch):
+    monkeypatch.setattr("sys.stderr.isatty", lambda: True, raising=False)
     pp = ProgressPrinter()
     pp.update_live(0, 2, 5, 0)
     assert "fragment 2/5" in capsys.readouterr().err

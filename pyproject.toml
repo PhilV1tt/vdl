@@ -10,12 +10,13 @@ requires-python = ">=3.9"
 dependencies = [
     "yt-dlp>=2024.01.01",
     "questionary>=2.0",
+    "prompt-toolkit>=3.0,<4",
     "tomli>=1.1; python_version < '3.11'",
     "colorama>=0.4; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.4", "mypy>=1.0"]
+dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.4", "mypy>=1.0,<1.19"]
 music = ["mutagen>=1.45", "musicbrainzngs>=0.7"]
 
 [project.scripts]
@@ -40,4 +41,4 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=vdl --cov-report=term-missing"
+addopts = "-q"

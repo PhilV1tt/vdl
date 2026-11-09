@@ -3,21 +3,24 @@
 Sortie audio : mp3 m4a aac flac wav ogg opus.  Sortie vidéo : mp4 mkv webm avi mov.
 Encodage vidéo : h264 + aac, sauf webm en vp9 + opus.
 Débit audio (`-q`) : 320 kbps par défaut, ramené au maximum de l'encodeur.  Hauteur vidéo
-(`-q`) : inchangée par défaut.  Un fichier de même nom déjà présent est écrasé.
+(`-q`) : inchangée par défaut. Les fichiers existants sont conservés.
 """
 
 from __future__ import annotations
 
 import argparse
 import re
+import shlex
 import subprocess
 import sys
 from functools import lru_cache
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from urllib.parse import unquote, urlparse
 
 from . import presets
 from .i18n import t
-from .tui import BOLD, DIM, RESET, Spinner, success_flash
+from .tui import BOLD, DIM, Spinner, c, success_flash
 
 AUDIO_KBPS: set[str] = {q["value"] for q in presets.AUDIO_QUALITIES}
 
@@ -36,6 +39,36 @@ _LOSSLESS = ("flac", "wav")
 _NATIVE = ("vorbis", "opus")
 _PROGRESS_LINE = re.compile(r"^(size|frame)=")
 _ENCODER_FLAGS = re.compile(r"^[VAS][A-Z.]{5}$")
+
+
+def local_path(raw: str) -> Path:
+    """Accept a quoted or shell-escaped path pasted from a file manager."""
+    raw = raw.strip()
+    if Path(raw).expanduser().is_file():
+        return Path(raw).expanduser()
+    if sys.platform != "win32":
+        try:
+            parts = shlex.split(raw)
+        except ValueError:
+            parts = []
+        if len(parts) == 1:
+            raw = parts[0]
+    else:
+        raw = raw.strip('"')
+    if raw.startswith("file://"):
+        raw = unquote(urlparse(raw).path)
+    return Path(raw).expanduser()
+
+
+def is_local_target(raw: str) -> bool:
+    if raw.startswith(("http://", "https://", "@")):
+        return False
+    path = local_path(raw)
+    return (
+        path.is_file()
+        or raw.startswith(("/", "./", "../", "~/", "file://"))
+        or (path.suffix.lower().lstrip(".") in presets.ALL_EXTS | {"m4v", "m4b", "aiff", "aif", "wma", "wmv", "ts"})
+    )
 
 
 @lru_cache(maxsize=1)
@@ -70,11 +103,13 @@ def _video_args(ext: str, quality: str) -> list[str]:
     if ext == "webm":
         # vp9 est 10x plus lent que h264 : on garde -cpu-used 4 pour rester sous quelques minutes
         args = ["-c:v", "libvpx-vp9", "-crf", "32", "-b:v", "0", "-deadline", "good", "-cpu-used", "4"]
-        return [*args, *_audio_args("opus", "192")]
-    args = ["-c:v", "libx264", "-preset", "medium", "-crf", "20"]
+        audio_args = _audio_args("opus", "192")
+    else:
+        args = ["-c:v", "libx264", "-preset", "medium", "-crf", "20"]
+        audio_args = _audio_args("m4a", "192")
     if quality in presets.QUALITY_KEYS and quality != "best":
         args += ["-vf", f"scale=-2:{quality}"]  # -2 = largeur paire, garde le ratio
-    return [*args, *_audio_args("m4a", "192")]
+    return [*args, *audio_args]
 
 
 def build_command(src: Path, dst: Path, ext: str, quality: str) -> list[str]:
@@ -96,32 +131,39 @@ def _ffmpeg_error(stderr: str, returncode: int) -> str:
 def convert_one(src: Path, dst: Path, ext: str, quality: str) -> None:
     """Convertit un fichier ; lève RuntimeError avec la fin de la sortie ffmpeg en cas d'échec."""
     dst.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        done = subprocess.run(build_command(src, dst, ext, quality), capture_output=True, text=True)
-    except BaseException:
-        dst.unlink(missing_ok=True)  # ffmpeg laisse un fichier partiel
-        raise
-    if done.returncode != 0 or not dst.exists():
-        dst.unlink(missing_ok=True)
-        raise RuntimeError(_ffmpeg_error(done.stderr, done.returncode))
+    if src.resolve() == dst.resolve():
+        raise RuntimeError(f"La sortie ne peut pas remplacer la source : {src}")
+    if dst.exists():
+        raise RuntimeError(f"Le fichier de sortie existe déjà : {dst}")
+    with TemporaryDirectory(prefix=".vdl-", dir=dst.parent) as folder:
+        partial = Path(folder) / dst.name
+        done = subprocess.run(build_command(src, partial, ext, quality), capture_output=True, text=True)
+        if done.returncode != 0 or not partial.is_file():
+            raise RuntimeError(_ffmpeg_error(done.stderr, done.returncode))
+        partial.replace(dst)
 
 
 def output_path(src: Path, ext: str, output_dir: str | None) -> Path:
     folder = Path(output_dir).expanduser() if output_dir else src.parent
-    return folder / f"{src.stem}.{ext}"
+    dst = folder / f"{src.stem}.{ext}"
+    index = 1
+    while dst.exists() or dst.resolve() == src.resolve():
+        dst = folder / f"{src.stem} ({index}).{ext}"
+        index += 1
+    return dst
 
 
 def convert_files(files: list[str], ext: str, quality: str, output_dir: str | None) -> int:
     """Convertit chaque fichier, un par un. Retourne 0 si tous ont réussi."""
     ok = fail = 0
     for raw in files:
-        src = Path(raw).expanduser()
+        src = local_path(raw)
         if not src.is_file():
             print(t("err_no_file", name=raw), file=sys.stderr)
             fail += 1
             continue
         dst = output_path(src, ext, output_dir)
-        print(f"{BOLD}{src.name}{RESET}  ->  {dst.name}  {DIM}[{ext.upper()} · {quality}]{RESET}", flush=True)
+        print(f"{c(src.name, BOLD)}  ->  {dst.name}  {c(f'[{ext.upper()} · {quality}]', DIM)}", flush=True)
         with Spinner(t("converting")):
             try:
                 convert_one(src, dst, ext, quality)
@@ -183,11 +225,13 @@ def resolve_format_and_quality(args: argparse.Namespace) -> tuple[str, str]:
 
 def run_convert(argv: list[str]) -> int:
     """Point d'entree du sous-commande `vdl convert`."""
-    from .downloader import check_deps
+    import shutil
 
-    check_deps()
-    args = _make_parser().parse_args(argv)
+    args = _make_parser().parse_intermixed_args(argv)
     ext, quality = resolve_format_and_quality(args)
+    if not shutil.which("ffmpeg"):
+        print("ffmpeg est nécessaire pour convertir. Installation : brew install ffmpeg (macOS).", file=sys.stderr)
+        return 1
     try:
         return convert_files(args.files, ext, quality, args.output)
     except KeyboardInterrupt:

@@ -10,6 +10,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from . import presets
+
 STATE_PATH = Path.home() / ".local" / "share" / "vdl" / "state.json"
 
 
@@ -34,8 +36,14 @@ def resolve(
 ) -> tuple[str, str, str]:
     """Résout qualité/format/dossier : explicite > mémoire > config > défaut."""
     fmt_key = "audio_format" if is_audio else "video_format"
-    resolved_quality = quality or state.get("quality") or cfg.default_quality or "best"
-    resolved_ext = fmt or state.get(fmt_key) or cfg.default_format or ("mp3" if is_audio else "mp4")
+    valid_quality = {q["value"] for q in presets.AUDIO_QUALITIES} if is_audio else presets.QUALITY_KEYS
+    remembered = state.get("audio_quality" if is_audio else "video_quality") or state.get("quality")
+    default = "320" if is_audio else "best"
+    resolved_quality = quality or (remembered if remembered in valid_quality else None)
+    resolved_quality = resolved_quality or (cfg.default_quality if cfg.default_quality in valid_quality else default)
+    formats = presets.AUDIO_EXTS if is_audio else presets.VIDEO_EXTS
+    configured = cfg.default_format if cfg.default_format in formats else None
+    resolved_ext = fmt or state.get(fmt_key) or configured or ("mp3" if is_audio else "mp4")
     resolved_output = output or state.get("output") or cfg.output_dir
     return resolved_quality, resolved_ext, resolved_output
 
@@ -45,8 +53,9 @@ def remember(is_audio: bool, *, quality: str | None = None, fmt: str | None = No
     if not any((quality, fmt, output)):
         return
     state = recall()
+    state["mode"] = "audio" if is_audio else "video"
     if quality:
-        state["quality"] = quality
+        state["audio_quality" if is_audio else "video_quality"] = quality
     if fmt:
         state["audio_format" if is_audio else "video_format"] = fmt
     if output:

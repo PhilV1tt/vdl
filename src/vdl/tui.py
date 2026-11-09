@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import os
 import sys
 import threading
 import time
@@ -54,7 +55,7 @@ RESET = "\033[0m"
 
 
 def _supports_color() -> bool:
-    return hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
+    return sys.stdout.isatty() and "NO_COLOR" not in os.environ
 
 
 def c(text: str, code: str) -> str:
@@ -91,32 +92,13 @@ def type_print(text: str, prefix: str = "", delay: float = 0.025) -> None:
 
 
 def animate_separator(width: int = 44, color: str = "") -> None:
-    """Trace une ligne ─ caractère par caractère."""
-    col = color if color else DIM
-    if not _supports_color():
-        print(f"  {'─' * width}")
-        return
-    sys.stdout.write(f"  {col}")
-    for _ in range(width):
-        sys.stdout.write("─")
-        sys.stdout.flush()
-        time.sleep(0.004)
-    sys.stdout.write(f"{RESET}\n")
-    sys.stdout.flush()
+    """Print a separator without delaying input."""
+    print(c(f"  {'─' * width}", color or DIM))
 
 
 def success_flash(message: str) -> None:
-    """Affiche un message de succès avec un flash blanc → vert."""
-    if not _supports_color():
-        print(f"  ✓  {message}")
-        return
-    # Flash blanc vif d'abord
-    sys.stdout.write(f"  {BOLD}{WHITE}✓  {message}{RESET}\n")
-    sys.stdout.flush()
-    time.sleep(0.12)
-    # Remplacer par vert
-    sys.stdout.write(f"\033[1A\r  {BOLD}{GREEN}✓  {message}{RESET}\n")
-    sys.stdout.flush()
+    """Print the completed operation once."""
+    print(c(f"  ✓  {message}", GREEN))
 
 
 def fade_out(message: str, color: str = "") -> None:
@@ -146,22 +128,31 @@ class Spinner:
         self._thread = threading.Thread(target=self._spin, daemon=True)
 
     def _spin(self) -> None:
+        started = time.monotonic()
         for frame in itertools.cycle(_SPIN_FRAMES):
             if self._stop.is_set():
                 break
-            sys.stderr.write(f"\r{CYAN}{frame}{RESET} {self._message}")
+            elapsed = time.monotonic() - started
+            if "VDL_REDUCED_MOTION" in os.environ:
+                frame = "·"
+            timer = f"  {elapsed:.0f}s" if elapsed >= 2 else ""
+            sys.stderr.write(f"\r{c(frame, CYAN)} {self._message}{timer}")
             sys.stderr.flush()
-            time.sleep(0.08)
+            self._stop.wait(0.08)
         sys.stderr.write("\r\033[K")
         sys.stderr.flush()
 
     def __enter__(self) -> Spinner:
-        self._thread.start()
+        if sys.stderr.isatty():
+            self._thread.start()
+        else:
+            print(self._message, file=sys.stderr)
         return self
 
     def __exit__(self, *_: object) -> None:
         self._stop.set()
-        self._thread.join(timeout=1)
+        if self._thread.ident is not None:
+            self._thread.join(timeout=1)
 
 
 # ── Style questionary ──────────────────────────────────────────────────────
@@ -199,7 +190,7 @@ def select(
 
         result: str | None = questionary.select(message, choices=choices, default=default, style=_STYLE).ask()
         return result
-    except (ImportError, KeyboardInterrupt):
+    except (ImportError, KeyboardInterrupt, EOFError):
         return None
 
 
@@ -210,7 +201,7 @@ def text(message: str, default: str = "") -> str | None:
 
         result: str | None = questionary.text(message, default=default, style=_STYLE).ask()
         return result
-    except (ImportError, KeyboardInterrupt):
+    except (ImportError, KeyboardInterrupt, EOFError):
         return None
 
 
@@ -221,7 +212,7 @@ def confirm(message: str, default: bool = True) -> bool:
 
         result: bool | None = questionary.confirm(message, default=default, style=_STYLE).ask()
         return bool(result) if result is not None else False
-    except (ImportError, KeyboardInterrupt):
+    except (ImportError, KeyboardInterrupt, EOFError):
         return False
 
 
@@ -232,7 +223,7 @@ def autocomplete(message: str, choices: list[str], default: str = "") -> str | N
 
         result: str | None = questionary.autocomplete(message, choices=choices, default=default, style=_STYLE).ask()
         return result
-    except (ImportError, KeyboardInterrupt):
+    except (ImportError, KeyboardInterrupt, EOFError):
         return None
 
 
