@@ -10,3 +10,7 @@ build/
 .pytest_cache/
 .ruff_cache/
 *.egg
+.coverage
+coverage.xml
+htmlcov/
+.DS_Store
