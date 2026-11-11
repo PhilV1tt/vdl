@@ -1,468 +1,567 @@
-"""Interactive downloads and conversions. Run: vdl.
+"""Interactive mode: a download queue under an input line that is always ready. Run: vdl
 
-Uses yt-dlp for metadata and downloads, prompt-toolkit for inline choices.
+Pasting a link starts the download at once with the settings shown on screen, and the next
+link can be pasted while it runs. Text that is not a link searches YouTube; a local file path
+converts the file. Settings change only while the input line is empty: Tab audio/video,
+up/down the format, left/right the quality. Finished items are printed above the screen.
+
+prompt_toolkit draws the screen; yt-dlp and ffmpeg run in worker threads (MAX_PARALLEL).
 """
 
 from __future__ import annotations
 
 import os
+import shutil
+import subprocess
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
-from . import __version__, prefs
+from prompt_toolkit.application import Application
+from prompt_toolkit.buffer import Buffer
+from prompt_toolkit.filters import Condition
+from prompt_toolkit.formatted_text import FormattedText
+from prompt_toolkit.key_binding import KeyBindings, KeyPressEvent
+from prompt_toolkit.keys import Keys
+from prompt_toolkit.layout import HSplit, Layout, Window
+from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
+from prompt_toolkit.layout.processors import BeforeInput
+from prompt_toolkit.output import ColorDepth
+from prompt_toolkit.patch_stdout import patch_stdout
+from prompt_toolkit.shortcuts import print_formatted_text
+
+from . import __version__, prefs, presets
 from .config import load_config
-from .downloader import Downloader, kind, probe
-from .i18n import t
-from .links import normalize_channel_url
-from .tui import (
-    BOLD,
-    CYAN,
-    DIM,
-    RESET,
-    Spinner,
-    c,
-    confirm,
-    select,
-    text,
-)
+from .convert import is_local_target, local_path
+from .downloader import Cancelled, Downloader
+from .links import is_channel_target, normalize_channel_url
+
+MAX_PARALLEL = 3
+SPIN = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+LOSSLESS = ("flac", "wav")
+QUIT_WINDOW = 3.0  # s to confirm quitting while items run
 
 
-def _banner() -> None:
-    print(f"\n{c('  ▸ vdl', BOLD + CYAN)}  {c(__version__, DIM)}")
-    print("  A link to download, a file to convert, a title to search.")
-    print(c("  /convert  /search  /history  /quit", DIM))
-    print()
+@dataclass
+class Job:
+    """One queued item: a URL to download or a local file to convert."""
+
+    target: str
+    is_audio: bool
+    ext: str
+    quality: str
+    output_dir: str
+    music: bool = False
+    section: str | None = None
+    title: str = ""
+    status: str = "queued"  # queued, running, converting
+    pct: float | None = None
+    speed: float = 0.0  # bytes/s
+    eta: int = 0  # s
+    size: int = 0  # bytes received, when the total is unknown (live)
+    cancel: threading.Event = field(default_factory=threading.Event)
 
 
-# ── Saisie de l'URL ─────────────────────────────────────────────────────────
+@dataclass
+class State:
+    """Everything the screen shows. Workers write job fields; the UI thread reads them."""
+
+    cfg: Any
+    is_audio: bool = False
+    video: dict[str, str] = field(default_factory=dict)  # {"ext", "quality"}
+    audio: dict[str, str] = field(default_factory=dict)
+    output_dir: str = ""
+    music: bool = False
+    jobs: list[Job] = field(default_factory=list)
+    results: list[dict[str, Any]] = field(default_factory=list)  # last search
+    searching: str = ""
+    notice: str = ""
+    last_file: Path | None = None
+    clipboard: str = ""
+    seen: set[str] = field(default_factory=set)  # targets already queued this session
+    folder_edit: bool = False
+    quit_armed_at: float = -1e9  # monotonic s
+    lock: threading.Lock = field(default_factory=threading.Lock)
+    pool: ThreadPoolExecutor = field(default_factory=lambda: ThreadPoolExecutor(MAX_PARALLEL))
+    app: Application[None] | None = None
+
+    @property
+    def mode(self) -> dict[str, str]:
+        return self.audio if self.is_audio else self.video
+
+    def refresh(self) -> None:
+        if self.app is not None:
+            self.app.invalidate()
 
 
-def normalize_input(raw: str) -> str:
-    """Normalize user input: @handle or bare domain -> full URL."""
-    raw = raw.strip()
-    if not raw.startswith(("http://", "https://")):
-        return normalize_channel_url(raw)
-    return raw
-
-
-def _fmt_dur(seconds: int | float | None) -> str:
-    if not seconds:
-        return ""
-    s = int(seconds)
-    return f"{s // 60}:{s % 60:02d}"
-
-
-# ── Options (divulgation progressive) ───────────────────────────────────────
-
-_BROWSERS = ["chrome", "safari", "firefox", "edge", "brave"]
-
-
-def _ask_metadata(is_audio: bool, strip_default: bool) -> dict[str, object]:
-    strip = confirm(t("opt_strip_meta"), default=strip_default)
-    title = (text(t("opt_title")) or "").strip() or None
-    no_thumb = confirm(t("opt_no_thumb"), default=False) if is_audio else False
-    artist = album = None
-    if is_audio and not strip:
-        artist = (text(t("opt_artist")) or "").strip() or None
-        album = (text(t("opt_album")) or "").strip() or None
-    return {"title": title, "artist": artist, "album": album, "strip_metadata": strip, "no_thumbnail": no_thumb}
-
-
-def _default_options(is_audio: bool, state: dict[str, Any], cfg: Any) -> dict[str, object]:
-    quality, ext, output_dir = prefs.resolve(None, None, None, is_audio, state, cfg)
-    return {
-        "playlist": False,
-        "music": cfg.music,
-        "quality": quality,
-        "ext": ext,
-        "output_dir": output_dir,
-        "section": None,
-        "subs": cfg.subs,
-        "sponsorblock": cfg.sponsorblock,
-        "title": None,
-        "artist": None,
-        "album": None,
-        "strip_metadata": False,
-        "no_thumbnail": False,
-        "cookies_browser": None,
-        "concurrent_fragments": cfg.concurrent_fragments,
-        "use_aria2c": cfg.aria2c,
-    }
-
-
-def _options_screen(o: dict[str, object], is_audio: bool) -> dict[str, object] | None:
-    """One level deep: quality, format, folder, excerpt, subtitles, sponsorblock, metadata, cookies."""
-    from . import presets
-
-    yes, no = t("opt_yes"), t("opt_no")
-
-    while True:
-        rows = [
-            {"name": f"{t('lbl_quality')}  {o['quality']}", "value": "quality"},
-            {"name": f"{t('opt_format_label')}  {str(o['ext']).upper()}", "value": "format"},
-            {"name": f"{t('lbl_output')}  {o['output_dir']}", "value": "output"},
-            {"name": f"{t('opt_section_label')}  {o['section'] or t('opt_section_none')}", "value": "section"},
-            {"name": f"{t('lbl_subs')}  {yes if o['subs'] else no}", "value": "subs"},
-            {"name": f"{t('lbl_sponsorblock')}  {yes if o['sponsorblock'] else no}", "value": "sponsorblock"},
-            {"name": t("opt_metadata_label"), "value": "meta"},
-            {"name": f"{t('opt_cookies_label')}  {o['cookies_browser'] or t('opt_cookies_none')}", "value": "cookies"},
-            {"name": "Download with these settings", "value": "back"},
-            {"name": "Cancel", "value": "cancel"},
-        ]
-        choice = select(t("options_title"), choices=rows)
-        if choice in (None, "cancel"):
-            return None
-        if choice == "back":
-            return o
-
-        if choice == "quality":
-            keys = [q["value"] for q in presets.AUDIO_QUALITIES] if is_audio else presets.QUALITY_KEYS
-            rows = presets.AUDIO_QUALITIES if is_audio else presets.VIDEO_QUALITIES
-            quality_choices = zip(keys, rows)
-            picked = select(
-                t("audio_quality") if is_audio else t("video_quality"),
-                choices=[{"name": q["label"], "value": k} for k, q in quality_choices],
-            )
-            if picked:
-                o["quality"] = picked
-        elif choice == "format":
-            table = presets.AUDIO_FORMATS if is_audio else presets.VIDEO_FORMATS
-            picked_f = select(t("opt_format_prompt"), choices=[{"name": f["label"], "value": f["ext"]} for f in table])
-            if picked_f:
-                o["ext"] = picked_f
-        elif choice == "output":
-            d = text(t("output_dir_prompt"), default=str(o["output_dir"]))
-            if d and d.strip():
-                o["output_dir"] = d.strip()
-        elif choice == "section":
-            s = text(t("opt_section_prompt"), default=str(o["section"] or ""))
-            if s is not None:
-                o["section"] = s.strip() or None
-        elif choice == "subs":
-            o["subs"] = confirm(t("subs_prompt"), default=bool(o["subs"]))
-        elif choice == "sponsorblock":
-            o["sponsorblock"] = confirm(t("sponsorblock_prompt"), default=bool(o["sponsorblock"]))
-        elif choice == "meta":
-            o.update(_ask_metadata(is_audio, bool(o["strip_metadata"])))
-        elif choice == "cookies":
-            picked_b = select(
-                t("opt_cookies_prompt"),
-                choices=[{"name": t("opt_cookies_none"), "value": ""}]
-                + [{"name": b.title(), "value": b} for b in _BROWSERS],
-            )
-            o["cookies_browser"] = picked_b or None
-
-
-# ── Download ───────────────────────────────────────────────────────────
-
-
-def _run_download(url: str, is_audio: bool, o: dict[str, object], info: dict[str, Any] | None) -> int:
-    from . import presets
-
-    quality_selector, audio_kbps = presets.build_quality_selector(is_audio, str(o["quality"]))
-    dl = Downloader(
-        playlist=bool(o["playlist"]),
-        output_dir=str(o["output_dir"]),
-        embed_thumbnail=not o["no_thumbnail"],
-        sponsorblock=bool(o["sponsorblock"]),
-        subs=bool(o["subs"]),
-        strip_metadata=bool(o["strip_metadata"]),
-        custom_title=o["title"],  # type: ignore[arg-type]
-        sections=[str(o["section"])] if o["section"] else None,
-        cookies_browser=o["cookies_browser"],  # type: ignore[arg-type]
-        concurrent_fragments=int(o["concurrent_fragments"]),  # type: ignore[call-overload]
-        use_aria2c=bool(o["use_aria2c"]),
+def new_state(cfg: Any) -> State:
+    memory = prefs.recall()
+    v_quality, v_ext, output = prefs.resolve(None, None, None, False, memory, cfg)
+    a_quality, a_ext, _ = prefs.resolve(None, None, None, True, memory, cfg)
+    return State(
+        cfg=cfg,
+        is_audio=memory.get("mode") == "audio",
+        video={"ext": v_ext, "quality": v_quality},
+        audio={"ext": a_ext, "quality": a_quality},
+        output_dir=output,
+        music=cfg.music,
     )
-    mode = "AUDIO" if is_audio else "VIDÉO"
-    print(c(f"\n  ↓ {mode} · {str(o['ext']).upper()} · starting download", BOLD + CYAN))
-    result = dl.download(url, str(o["ext"]), is_audio, quality_selector, audio_kbps, info=info)
-    if result.exit_code == 0:
-        prefs.remember(is_audio, quality=str(o["quality"]), fmt=str(o["ext"]), output=str(o["output_dir"]))
-
-    if is_audio and result.exit_code == 0 and result.file_path and not o["strip_metadata"]:
-        tags = {k: v for k, v in (("title", o["title"]), ("artist", o["artist"]), ("album", o["album"])) if v}
-        if tags:
-            from .music import _auto_install_deps, write_tags
-
-            if _auto_install_deps():
-                write_tags(result.file_path, tags)
-
-    if is_audio and result.exit_code == 0 and result.file_path and o["music"]:
-        from .music import music_pipeline
-
-        music_pipeline(result.file_path, result.info)
-
-    return result.exit_code
 
 
-def _single_flow(
-    url: str, info: dict[str, Any], is_live: bool, state: dict[str, Any], cfg: Any, *, playlist: bool = False
-) -> int:
-    """Choose and adjust the download on one keyboard-driven screen."""
-    from prompt_toolkit import Application
-    from prompt_toolkit.key_binding import KeyBindings, KeyPressEvent
-    from prompt_toolkit.keys import Keys
-    from prompt_toolkit.layout import Layout, Window
-    from prompt_toolkit.layout.controls import FormattedTextControl
-    from prompt_toolkit.output import ColorDepth
+# ── What the input line means ───────────────────────────────────────────────
 
-    from . import presets
 
-    title = info.get("title") or "Video"
-    detail = "LIVE" if is_live else "playlist" if playlist else _fmt_dur(info.get("duration"))
-    print(c("\n  ✓ Link recognized", CYAN))
-    print(f"  {c(str(title), BOLD)}  {c(detail, DIM)}")
-    video_o = _default_options(False, state, cfg)
-    audio_o = _default_options(True, state, cfg)
-    for options in (video_o, audio_o):
-        options["playlist"] = playlist
-    is_audio = state.get("mode") == "audio"
-    keys = KeyBindings()
-    changed = ""
-    changed_at = 0.0
-    notice = "Your last settings are ready."
-    reduced_motion = "VDL_REDUCED_MOTION" in os.environ or "NO_COLOR" in os.environ
+def classify(raw: str) -> str:
+    """'command', 'file', 'url' or 'search'."""
+    if raw.startswith("/") and " " not in raw and raw.count("/") == 1 and not local_path(raw).exists():
+        return "command"
+    if is_local_target(raw):
+        return "file"
+    if raw.startswith(("http://", "https://", "@")) or ("." in raw.split("/")[0] and " " not in raw):
+        return "url"
+    return "search"
 
-    def render() -> list[tuple[str, str]]:
-        o = audio_o if is_audio else video_o
-        quality = str(o["quality"])
-        if is_audio:
-            quality = "lossless" if o["ext"] in ("flac", "wav") else f"{quality} kbps"
-        else:
-            quality = "max quality" if quality == "best" else f"{quality}p"
-        flags = []
-        if o["section"]:
-            flags.append(f"excerpt {o['section']}")
-        if o["subs"]:
-            flags.append("subtitles")
-        if o["sponsorblock"]:
-            flags.append("SponsorBlock")
-        details = f" · {', '.join(flags)}" if flags else ""
-        accent = "fg:ansicyan bold"
-        active = "bg:ansicyan fg:ansiblack bold"
-        hint = "fg:ansibrightblack"
-        flash = "reverse bold" if not reduced_motion and time.monotonic() - changed_at < 0.2 else accent
-        fragments = [
-            ("", "\n  "),
-            (active if not is_audio else hint, " ▸ VIDÉO " if not is_audio else "   VIDÉO "),
-            ("", "  "),
-            (active if is_audio else hint, " ▸ AUDIO " if is_audio else "   AUDIO "),
-            (hint, "   Tab to switch\n\n  "),
-            (hint, "FORMAT   "),
-            (flash if changed == "ext" else accent, f"[ {str(o['ext']).upper()} ]"),
-            (hint, "  ↑ ↓    QUALITY   "),
-            (flash if changed == "quality" else accent, f"[ {quality} ]"),
-            (hint, "  ← →\n"),
-            ("", f"  → {o['output_dir']}{details}\n\n  "),
-            ("fg:ansigreen", f"✓ {notice}\n\n  "),
-            (active, " ↵ Download "),
-            ("", "   "),
-            (accent, "a"),
-            ("", " audio direct   "),
-            (accent, "v"),
-            ("", " direct video"),
+
+def split_section(raw: str) -> tuple[str, str | None]:
+    """'URL 12:00-14:30' -> ('URL', '12:00-14:30'): an excerpt typed after the link."""
+    head, _, tail = raw.rpartition(" ")
+    if head and "-" in tail and all(part.replace(":", "").replace(".", "").isdigit() for part in tail.split("-", 1)):
+        return head.strip(), tail
+    return raw, None
+
+
+def clipboard_url() -> str:
+    """The URL in the clipboard, or ''. macOS only (pbpaste is instant)."""
+    if sys.platform != "darwin" or not shutil.which("pbpaste"):
+        return ""
+    try:
+        text = subprocess.run(["pbpaste"], capture_output=True, text=True, timeout=1).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return text if text.startswith(("http://", "https://")) and "\n" not in text and " " not in text else ""
+
+
+# ── Queue and workers ───────────────────────────────────────────────────────
+
+
+def enqueue(state: State, target: str, section: str | None = None) -> Job:
+    """Queue `target` with the settings on screen and remember them for the next run."""
+    mode = state.mode
+    job = Job(
+        target=target,
+        is_audio=state.is_audio,
+        ext=mode["ext"],
+        quality=mode["quality"],
+        output_dir=state.output_dir,
+        music=state.music and state.is_audio,
+        section=section,
+        title=local_path(target).name if is_local_target(target) else "",
+    )
+    with state.lock:
+        state.jobs.append(job)
+        state.seen.add(target)
+    prefs.remember(state.is_audio, quality=mode["quality"], fmt=mode["ext"], output=state.output_dir)
+    state.pool.submit(run_job, state, job)
+    state.refresh()
+    return job
+
+
+def run_job(state: State, job: Job) -> None:
+    """Worker thread: run one job, then print its outcome above the screen."""
+    job.status = "running"
+    state.refresh()
+    try:
+        path, error = convert_job(job) if is_local_target(job.target) else download_job(state, job)
+    except Exception as e:  # a worker must never die silently
+        path, error = None, f"{type(e).__name__}: {e}"
+    with state.lock:
+        state.jobs.remove(job)
+        if path is not None:
+            state.last_file = path
+    name = job.title or job.target
+    if path is not None:
+        size = f"{path.stat().st_size / 1e6:.1f} MB" if path.exists() else ""
+        print_line([("fg:ansigreen", "  ✓ "), ("bold", name), ("", f"  {size}  "), ("fg:ansibrightblack", str(path))])
+    elif not job.cancel.is_set():
+        print_line([("fg:ansired", "  ✗ "), ("bold", name), ("", "  "), ("fg:ansired", error.replace("\n", " "))])
+    state.refresh()
+
+
+def download_job(state: State, job: Job) -> tuple[Path | None, str]:
+    cfg = state.cfg
+    url = normalize_channel_url(job.target)
+    selector, kbps = presets.build_quality_selector(job.is_audio, job.quality)
+    dl = Downloader(
+        output_dir=job.output_dir,
+        playlist=is_channel_target(job.target),
+        embed_thumbnail=cfg.embed_thumbnail,
+        sponsorblock=cfg.sponsorblock,
+        subs=cfg.subs,
+        subs_lang=cfg.subs_lang,
+        output_template=cfg.output_template,
+        retries=cfg.retries,
+        sections=[job.section] if job.section else None,
+        concurrent_fragments=cfg.concurrent_fragments,
+        use_aria2c=cfg.aria2c,
+    )
+
+    def report(event: dict[str, Any]) -> None:
+        if job.cancel.is_set():
+            raise Cancelled
+        if "title" in event:
+            job.title = event["title"] + ("  ● LIVE" if event.get("live") else "")
+        if "pct" in event:
+            job.pct, job.speed, job.eta = event["pct"], event["speed"], int(event["eta"])
+        if "bytes" in event:
+            job.pct, job.size, job.speed = None, event["bytes"], event["speed"]
+        if event.get("converting"):
+            job.status = "converting"
+        state.refresh()
+
+    result = dl.download(url, job.ext, job.is_audio, selector, kbps, report=report)
+    if result.exit_code != 0:
+        return None, result.error or "download failed"
+    if result.file_path is None:  # a playlist: several files, no single path
+        return Path(job.output_dir), ""
+    if job.music and result.file_path is not None:
+        job.status = "converting"
+        state.refresh()
+        import_to_music(result.file_path, result.info)
+    return result.file_path, ""
+
+
+def convert_job(job: Job) -> tuple[Path | None, str]:
+    from .convert import convert_one, output_path
+
+    src = local_path(job.target)
+    if not src.is_file():
+        return None, f"no such file: {src}"
+    dst = output_path(src, job.ext, None)
+    job.status = "converting"
+    try:
+        convert_one(src, dst, job.ext, job.quality)
+    except (RuntimeError, OSError) as e:
+        return None, str(e)
+    return dst, ""
+
+
+def import_to_music(path: Path, info: dict[str, Any]) -> None:
+    """Tag from MusicBrainz and add to Apple Music, silently (the screen owns the terminal)."""
+    from .music import _auto_install_deps, import_to_music_app, lookup_metadata, write_tags
+
+    if _auto_install_deps():
+        title = str(info.get("title") or path.stem)
+        write_tags(path, lookup_metadata(title, str(info.get("uploader") or "")))
+    import_to_music_app(path)
+
+
+def search(state: State, query: str) -> None:
+    """Worker thread: YouTube search; results appear as a numbered list."""
+    from .search import search_videos
+
+    state.searching, state.results = query, []
+    state.refresh()
+    results = search_videos(query, n=9)
+    state.searching, state.results = "", results
+    state.notice = "" if results else f"No result for “{query}”."
+    state.refresh()
+
+
+def print_line(fragments: list[tuple[str, str]]) -> None:
+    """Print above the screen (patch_stdout keeps the screen below)."""
+    print_formatted_text(FormattedText(fragments))
+
+
+def reveal(path: Path) -> None:
+    if sys.platform == "darwin":
+        subprocess.run(["open", "-R", str(path)], check=False)
+    elif sys.platform == "win32":
+        subprocess.run(["explorer", f"/select,{path}"], check=False)
+    else:
+        subprocess.run(["xdg-open", str(path.parent)], check=False)
+
+
+# ── Screen ──────────────────────────────────────────────────────────────────
+
+ACCENT = "fg:ansicyan bold"
+ACTIVE = "bg:ansicyan fg:ansiblack bold"
+HINT = "fg:ansibrightblack"
+
+
+def _fmt_eta(seconds: int) -> str:
+    return f"{seconds // 60}:{seconds % 60:02d}"
+
+
+def _choice_row(label: str, values: list[str], current: str, keys: str) -> list[tuple[str, str]]:
+    row: list[tuple[str, str]] = [(HINT, f"  {label:<9}")]
+    for value in values:
+        row += [(ACTIVE if value == current else "", f" {value} "), ("", " ")]
+    return [*row, (HINT, f"  {keys}\n")]
+
+
+def render_settings(state: State) -> list[tuple[str, str]]:
+    mode = state.mode
+    out: list[tuple[str, str]] = [
+        (ACCENT, "  vdl "),
+        (HINT, f"{__version__}   "),
+        (ACTIVE if not state.is_audio else HINT, " VIDEO "),
+        ("", " "),
+        (ACTIVE if state.is_audio else HINT, " AUDIO "),
+        (HINT, "  Tab\n"),
+    ]
+    formats = [f["ext"] for f in (presets.AUDIO_FORMATS if state.is_audio else presets.VIDEO_FORMATS)]
+    out += _choice_row("format", formats, mode["ext"], "↑↓")
+    if state.is_audio and mode["ext"] in LOSSLESS:
+        out += [(HINT, "  quality  "), ("", " lossless\n")]
+    else:
+        qualities = [q["value"] for q in presets.AUDIO_QUALITIES] if state.is_audio else presets.QUALITY_KEYS
+        out += _choice_row("quality", qualities, mode["quality"], "←→")
+    out += [(HINT, "  folder   "), ("", f" {state.output_dir.replace(str(Path.home()), '~')}"), (HINT, "  ^O")]
+    if state.is_audio and sys.platform == "darwin":
+        out += [
+            (HINT, "   Apple Music "),
+            (ACCENT if state.music else HINT, "on" if state.music else "off"),
+            (HINT, " ^E"),
         ]
-        if sys.platform == "darwin":
-            fragments += [(accent, "   m"), ("", " Apple Music")]
-        fragments += [(hint, "\n\n  d folder   e excerpt   o options   Esc back\n")]
-        return fragments
+    return [*out, ("", "\n")]
 
-    @keys.add("tab")
-    def toggle(event: KeyPressEvent) -> None:
-        nonlocal is_audio, changed, changed_at, notice
-        is_audio = not is_audio
-        changed, changed_at = "mode", time.monotonic()
-        notice = "Audio selected." if is_audio else "Video selected."
 
-    @keys.add("left")
-    @keys.add("right")
-    @keys.add("up")
-    @keys.add("down")
-    def adjust(event: KeyPressEvent) -> None:
-        nonlocal changed, changed_at, notice
-        key = event.key_sequence[-1].key
-        o = audio_o if is_audio else video_o
-        if key in (Keys.Left, Keys.Right):
-            if is_audio and o["ext"] in ("flac", "wav"):
-                notice = "Lossless format: no bitrate to set."
-                return
-            values = [q["value"] for q in presets.AUDIO_QUALITIES] if is_audio else presets.QUALITY_KEYS
-            field = "quality"
+def render_jobs(state: State) -> list[tuple[str, str]]:
+    frame = "·" if "VDL_REDUCED_MOTION" in os.environ else SPIN[int(time.monotonic() * 10) % len(SPIN)]
+    out: list[tuple[str, str]] = []
+    with state.lock:
+        jobs = list(state.jobs)
+    width = shutil.get_terminal_size((80, 20)).columns
+    for job in jobs:
+        name = (job.title or job.target)[: max(10, width - 48)]
+        if job.status == "queued":
+            out += [(HINT, f"  · waiting  {name}\n")]
+        elif job.status == "converting":
+            out += [(ACCENT, f"  {frame} "), ("", f"{name}  "), (HINT, "converting…\n")]
+        elif job.pct is None and job.size:
+            out += [(ACCENT, f"  {frame} "), ("", f"{name}  {job.size / 1e6:.1f} MB  {job.speed / 1e6:.1f} MB/s\n")]
+        elif job.pct is None:
+            out += [(ACCENT, f"  {frame} "), ("", f"{name}  "), (HINT, "reading the link…\n")]
         else:
-            values = [f["ext"] for f in (presets.AUDIO_FORMATS if is_audio else presets.VIDEO_FORMATS)]
-            field = "ext"
-        step = 1 if key in (Keys.Right, Keys.Down) else -1
-        o[field] = values[(values.index(str(o[field])) + step) % len(values)]
-        changed, changed_at = field, time.monotonic()
-        notice = f"{'Format' if field == 'ext' else 'Quality'} : {str(o[field]).upper()}."
-        if event.app.loop is not None and not reduced_motion:
-            event.app.loop.call_later(0.2, event.app.invalidate)
+            filled = round(job.pct / 10)
+            bar = "█" * filled + "░" * (10 - filled)
+            out += [
+                (ACCENT, f"  {frame} "),
+                ("", f"{name}  "),
+                (ACCENT, bar),
+                ("", f" {job.pct:3.0f}%  {job.speed / 1e6:.1f} MB/s  {_fmt_eta(job.eta)}\n"),
+            ]
+    if state.searching:
+        out += [(ACCENT, f"  {frame} "), ("", f"searching “{state.searching}”…\n")]
+    from .search import _fmt_duration
+
+    for i, result in enumerate(state.results[:9], 1):
+        duration = _fmt_duration(result.get("duration"))  # type: ignore[arg-type]
+        queued = result["url"] in state.seen
+        out += [
+            (ACCENT, f"  {i} "),
+            (HINT if queued else "", f"{str(result.get('title', '?'))[: width - 24]}"),
+            (HINT, f"  {duration}{'  ✓ queued' if queued else ''}\n"),
+        ]
+    if state.results:
+        out += [(HINT, "  1-9 download (several allowed)   Esc close\n")]
+    return out
+
+
+def render_footer(state: State, text: str) -> list[tuple[str, str]]:
+    if state.notice:
+        return [("fg:ansiyellow", f"  {state.notice}")]
+    if state.folder_edit:
+        return [(HINT, "  ↵ save folder   Esc cancel")]
+    if not text and state.clipboard and state.clipboard not in state.seen:
+        return [(HINT, "  ↵ download the link in the clipboard  "), ("", state.clipboard[:60])]
+    parts = "  paste a link · type to search · drop a file to convert"
+    if state.last_file is not None:
+        parts += " · ^R show last file"
+    return [(HINT, parts + " · ^D quit")]
+
+
+def build_app(state: State) -> Application[None]:
+    buffer = Buffer(multiline=False)
+    keys = KeyBindings()
+    empty = Condition(lambda: not buffer.text and not state.folder_edit)
+
+    def say(message: str) -> None:
+        state.notice = message
+
+    def submit(raw: str) -> None:
+        raw = raw.strip()
+        if not raw:
+            url = clipboard_url()  # read again: it may have changed since startup
+            if url and url not in state.seen:
+                enqueue(state, url)
+            return
+        kind = classify(raw)
+        if kind == "command":
+            if raw in ("/q", "/quit"):
+                request_quit(state.app)
+            elif raw == "/history":
+                from .history import show_history
+
+                show_history()
+            else:
+                say("Commands: /history, /quit")
+        elif kind == "file":
+            enqueue(state, raw)
+        elif kind == "url":
+            target, section = split_section(raw)
+            enqueue(state, target, section)
+        else:
+            threading.Thread(target=search, args=(state, raw), daemon=True).start()
+
+    def request_quit(app: Application[None] | None) -> None:
+        running = list(state.jobs)
+        if running and time.monotonic() - state.quit_armed_at > QUIT_WINDOW:
+            state.quit_armed_at = time.monotonic()
+            say(f"{len(running)} item(s) in progress: press again to stop them and quit.")
+            return
+        for job in running:
+            job.cancel.set()
+        if app is not None:
+            app.exit()
 
     @keys.add("enter")
-    @keys.add("a")
-    @keys.add("v")
-    @keys.add("m")
-    @keys.add("d")
-    @keys.add("e")
-    @keys.add("o")
+    def _enter(event: KeyPressEvent) -> None:
+        text = buffer.text
+        buffer.reset()
+        if state.folder_edit:
+            state.folder_edit = False
+            folder = str(Path(text.strip()).expanduser()) if text.strip() else state.output_dir
+            state.output_dir = folder
+            say(f"Folder: {folder}")
+            return
+        submit(text)
+
+    @keys.add(Keys.BracketedPaste)
+    def _paste(event: KeyPressEvent) -> None:
+        """Pasting links on an empty line queues them at once, one per line."""
+        lines = [line.strip() for line in event.data.replace("\r", "\n").split("\n") if line.strip()]
+        if not buffer.text and not state.folder_edit and lines and all(classify(x) == "url" for x in lines):
+            for line in lines:
+                target, section = split_section(line)
+                enqueue(state, target, section)
+            return
+        buffer.insert_text(event.data.replace("\r", " ").replace("\n", " "))
+
+    @keys.add("tab", filter=empty)
+    def _mode(event: KeyPressEvent) -> None:
+        state.is_audio = not state.is_audio
+
+    @keys.add("up", filter=empty)
+    @keys.add("down", filter=empty)
+    @keys.add("left", filter=empty)
+    @keys.add("right", filter=empty)
+    def _adjust(event: KeyPressEvent) -> None:
+        key = event.key_sequence[-1].key
+        mode = state.mode
+        if key in (Keys.Up, Keys.Down):
+            field_name = "ext"
+            values = [f["ext"] for f in (presets.AUDIO_FORMATS if state.is_audio else presets.VIDEO_FORMATS)]
+        else:
+            if state.is_audio and mode["ext"] in LOSSLESS:
+                return
+            field_name = "quality"
+            values = [q["value"] for q in presets.AUDIO_QUALITIES] if state.is_audio else presets.QUALITY_KEYS
+        step = 1 if key in (Keys.Down, Keys.Right) else -1
+        mode[field_name] = values[(values.index(mode[field_name]) + step) % len(values)]
+
+    @keys.add("c-o")
+    def _folder(event: KeyPressEvent) -> None:
+        state.folder_edit = True
+        buffer.text = state.output_dir
+        buffer.cursor_position = len(buffer.text)
+
+    @keys.add("c-e")
+    def _music(event: KeyPressEvent) -> None:
+        if state.is_audio and sys.platform == "darwin":
+            state.music = not state.music
+
+    @keys.add("c-r")
+    def _reveal(event: KeyPressEvent) -> None:
+        if state.last_file is not None:
+            reveal(state.last_file)
+
+    for digit in "123456789":
+
+        @keys.add(digit, filter=empty & Condition(lambda: bool(state.results)))
+        def _pick(event: KeyPressEvent) -> None:
+            index = int(event.key_sequence[-1].key) - 1
+            if index < len(state.results) and state.results[index]["url"] not in state.seen:
+                enqueue(state, str(state.results[index]["url"]))
+
     @keys.add("escape", eager=True)
+    def _escape(event: KeyPressEvent) -> None:
+        if state.folder_edit:
+            state.folder_edit = False
+            buffer.reset()
+        elif state.results:
+            state.results = []
+        else:
+            buffer.reset()
+
     @keys.add("c-c")
     @keys.add("c-d")
-    def choose(event: KeyPressEvent) -> None:
-        event.app.exit(result=str(event.key_sequence[-1].key))
+    def _quit(event: KeyPressEvent) -> None:
+        request_quit(event.app)
 
-    app: Application[str] = Application(
-        layout=Layout(Window(FormattedTextControl(render), dont_extend_height=True, always_hide_cursor=True)),
+    prompt = Condition(lambda: state.folder_edit)
+    layout = Layout(
+        HSplit(
+            [
+                Window(FormattedTextControl(lambda: render_settings(state)), dont_extend_height=True),
+                Window(FormattedTextControl(lambda: render_jobs(state)), dont_extend_height=True),
+                Window(
+                    BufferControl(
+                        buffer,
+                        input_processors=[BeforeInput(lambda: [(ACCENT, "  folder > " if prompt() else "  > ")])],
+                    ),
+                    height=1,
+                ),
+                Window(FormattedTextControl(lambda: render_footer(state, buffer.text)), height=1),
+            ]
+        ),
+        focused_element=buffer,
+    )
+    app: Application[None] = Application(
+        layout=layout,
         key_bindings=keys,
+        refresh_interval=0.1,
         erase_when_done=True,
         color_depth=ColorDepth.DEPTH_1_BIT if "NO_COLOR" in os.environ else None,
     )
-    while True:
-        try:
-            action = app.run()
-        except EOFError:
-            return 0
-        if action in (str(Keys.Escape), str(Keys.ControlC), str(Keys.ControlD)):
-            return 0
-        if action in ("a", "m", "v"):
-            is_audio = action != "v"
-        o = audio_o if is_audio else video_o
-        if action in ("d", "e"):
-            field = "output_dir" if action == "d" else "section"
-            value = text("Folder" if action == "d" else "Excerpt (e.g. 12:00-14:30)", default=str(o[field] or ""))
-            if value is not None and (value.strip() or field == "section"):
-                o[field] = value.strip() or None
-                notice = "Folder updated." if field == "output_dir" else "Excerpt updated."
-        elif action == "o":
-            chosen = _options_screen(o, is_audio)
-            if chosen is None:
-                continue
-            return _run_download(url, is_audio, chosen, info)
-        else:
-            o["music"] = action == "m" or cfg.music
-            return _run_download(url, is_audio, o, info)
+
+    def _clear_notice(_: Any) -> None:
+        """Any key hides the one-shot notice; the quit confirmation lasts QUIT_WINDOW seconds."""
+        if time.monotonic() - state.quit_armed_at > QUIT_WINDOW:
+            state.notice = ""
+
+    app.key_processor.before_key_press += _clear_notice
+    return app
 
 
-def _download_flow(url: str) -> int:
-    """Probe the URL once, then choose download settings on one screen."""
-    cfg = load_config()
-    state = prefs.recall()
-
-    with Spinner(t("fetching")):
-        info = probe(url)
-    if info is None:
-        print(t("err_extract"), file=sys.stderr)
-        return 1
-
-    result_kind = kind(info)
-    if result_kind == "upcoming":
-        from .downloader import _print_upcoming
-
-        _print_upcoming(info)
-        return 0
-    return _single_flow(url, info, result_kind == "live", state, cfg, playlist=result_kind == "playlist")
+def run_interactive(initial: str | None = None) -> None:
+    """Open the queue screen; `initial` is handled like a first line typed by the user."""
+    state = new_state(load_config())
+    state.clipboard = clipboard_url()
+    state.app = build_app(state)
+    if initial:
+        state.app.pre_run_callables.append(lambda: _submit_initial(state, initial))
+    with patch_stdout(raw=True):
+        state.app.run()
+    state.pool.shutdown(wait=True, cancel_futures=True)
 
 
-def _search_flow(query: str = "", source: str | None = None) -> int:
-    """Search flow with result selection."""
-    from .search import SOURCES, search_videos
-
-    source_choice = source or select(
-        t("search_on"),
-        choices=[
-            {"name": "YouTube", "value": "youtube"},
-            {"name": "SoundCloud", "value": "soundcloud"},
-        ],
-    )
-    if source_choice is None:
-        return 0
-
-    query = query or text(t("search_query")) or ""
-    if not query or not query.strip():
-        return 0
-
-    source_name = next((k for k in SOURCES if k == source_choice), "youtube")
-    print()
-    with Spinner(t("searching", source=source_name.title())):
-        results = search_videos(query.strip(), source=source_name)
-    if not results:
-        print(t("no_results"), file=sys.stderr)
-        return 0
-
-    from .search import _fmt_duration, _fmt_views
-
-    def _label(r: dict[str, object]) -> str:
-        title = str(r.get("title", "?"))[:55]
-        dur = _fmt_duration(r.get("duration"))  # type: ignore[arg-type]
-        views = _fmt_views(r.get("view_count"))  # type: ignore[arg-type]
-        meta = "  ".join(filter(None, [dur, views]))
-        return f"{title}  {DIM}[{meta}]{RESET}" if meta else title
-
-    choices = [{"name": _label(r), "value": str(r["url"])} for r in results]
-    choices.append({"name": f"← {t('opt_back')}", "value": "__back__"})
-
-    url_choice = select(t("pick_result"), choices=choices)
-    if url_choice is None or url_choice == "__back__":
-        return 0
-
-    return _download_flow(url_choice)
-
-
-def _history_flow() -> None:
-    """Affiche l'historique."""
-    from .history import show_history
-
-    show_history()
-
-
-def _convert_flow(path: str | None = None) -> None:
-    """Convert a local file: path -> audio/video -> format -> quality."""
-    from . import presets
-    from .convert import local_path, run_convert
-
-    path = path or text(t("convert_prompt_file"))
-    if not path or not path.strip():
-        return
-
-    src = local_path(path)
-    if not src.is_file():
-        print(t("err_no_file", name=src), file=sys.stderr)
-        return
-    ext = select(
-        "Convertir en…",
-        choices=[f["label"] for f in presets.AUDIO_FORMATS + presets.VIDEO_FORMATS],
-    )
-    if not ext:
-        return
-    run_convert([str(src), "-f", ext.lower()])
-
-
-# ── Main entry point ───────────────────────────────────────────────
-
-
-def run_interactive() -> None:
-    _banner()
-    from .convert import is_local_target, local_path
-
-    while True:
-        raw = text("Link, file or search (Enter to quit)")
-        if not raw or not raw.strip() or raw.strip() == "/quit":
-            return
-        raw = raw.strip()
-        command, _, argument = raw.partition(" ")
-        if command == "/convert":
-            _convert_flow(argument or None)
-        elif command == "/search":
-            _search_flow(query=argument)
-        elif command == "/history":
-            _history_flow()
-        elif raw.startswith("/") and "/" not in raw[1:] and "." not in raw and not local_path(raw).exists():
-            print("Commande inconnue. Utilise /convert, /search, /history ou /quit.", file=sys.stderr)
-        elif is_local_target(raw):
-            _convert_flow(raw)
-        elif raw.startswith(("http://", "https://", "@")) or ("." in raw.split("/")[0] and " " not in raw):
-            _download_flow(normalize_input(raw))
-        else:
-            _search_flow(query=raw, source="youtube")
-        print()
+def _submit_initial(state: State, raw: str) -> None:
+    if classify(raw) == "search":
+        threading.Thread(target=search, args=(state, raw), daemon=True).start()
+    else:
+        enqueue(state, raw)

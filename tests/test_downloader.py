@@ -1,13 +1,12 @@
 from unittest.mock import patch
 
 from vdl.downloader import (
+    Cancelled,
     Downloader,
     _parse_section,
-    _print_upcoming,
     _remux_live_parts,
-    kind,
     list_formats,
-    probe,
+    upcoming_message,
 )
 
 
@@ -248,58 +247,18 @@ class TestParseSection:
         assert _parse_section("*90-120") == (90.0, 120.0)
 
 
-class TestKind:
-    def test_video(self):
-        assert kind({"title": "x"}) == "video"
+def test_error_message_strips_colors():
+    from vdl.downloader import error_message
 
-    def test_playlist(self):
-        assert kind({"entries": []}) == "playlist"
-
-    def test_live(self):
-        assert kind({"live_status": "is_live"}) == "live"
-
-    def test_upcoming(self):
-        assert kind({"live_status": "is_upcoming"}) == "upcoming"
+    assert error_message("\x1b[0;31mERROR:\x1b[0m Postprocessing: failed") == "Postprocessing: failed"
 
 
-class TestProbe:
-    def test_returns_info(self):
-        with patch("yt_dlp.YoutubeDL") as mock_cls:
-            mock_cls.return_value.__enter__.return_value.extract_info.return_value = {"title": "x"}
-            assert probe("https://example.com") == {"title": "x"}
+class TestUpcomingMessage:
+    def test_with_timestamp(self):
+        assert upcoming_message({"release_timestamp": 4102444800}).strip() != ""
 
-    def test_returns_none_on_exception(self):
-        with patch("yt_dlp.YoutubeDL") as mock_cls:
-            mock_cls.return_value.__enter__.return_value.extract_info.side_effect = Exception("boom")
-            assert probe("https://example.com") is None
-
-    def test_single_sets_noplaylist(self):
-        with patch("yt_dlp.YoutubeDL") as mock_cls:
-            mock_cls.return_value.__enter__.return_value.extract_info.return_value = {}
-            probe("https://example.com", single=True)
-        assert mock_cls.call_args[0][0]["noplaylist"] is True
-
-    def test_default_sets_noplaylist(self):
-        with patch("yt_dlp.YoutubeDL") as mock_cls:
-            mock_cls.return_value.__enter__.return_value.extract_info.return_value = {}
-            probe("https://example.com")
-        assert mock_cls.call_args[0][0]["noplaylist"] is True
-
-    def test_single_false_keeps_playlist(self):
-        with patch("yt_dlp.YoutubeDL") as mock_cls:
-            mock_cls.return_value.__enter__.return_value.extract_info.return_value = {}
-            probe("https://example.com", single=False)
-        assert mock_cls.call_args[0][0]["noplaylist"] is False
-
-
-class TestPrintUpcoming:
-    def test_with_timestamp(self, capsys):
-        _print_upcoming({"release_timestamp": 4102444800})
-        assert capsys.readouterr().out.strip() != ""
-
-    def test_without_timestamp(self, capsys):
-        _print_upcoming({})
-        assert capsys.readouterr().out.strip() != ""
+    def test_without_timestamp(self):
+        assert upcoming_message({}).strip() != ""
 
 
 class TestRemuxLiveParts:
@@ -340,29 +299,45 @@ class TestListFormats:
 
 
 class TestLiveDownload:
-    def test_probe_info_never_used_for_download(self):
-        """The probe comes from another YoutubeDL instance: its URLs return 403.
+    def test_quiet_extracts_once_and_reports(self, capsys):
+        """With report, one extraction feeds the download and nothing reaches the terminal."""
+        events = []
+        with patch("yt_dlp.YoutubeDL") as mock_cls:
+            ydl = mock_cls.return_value.__enter__.return_value
+            ydl.prepare_filename.return_value = "/tmp/vdl_test/Video.mp4"
+            info = {"title": "Video", "live_status": "not_live"}
+            ydl.extract_info.return_value = info
+            ydl.process_ie_result.return_value = info
+            result = make_dl().download("https://example.com/v", "mp4", False, "best", "0", report=events.append)
+        assert result.exit_code == 0
+        ydl.extract_info.assert_called_once_with("https://example.com/v", download=False)
+        assert ydl.process_ie_result.call_args[0][0] is info
+        assert events == [{"title": "Video", "live": False}]
+        assert mock_cls.call_args[0][0]["logger"] is not None
+        out = capsys.readouterr()
+        assert out.out == "" and out.err == ""
 
-        The info used for the download must always be re-extracted here.
-        """
-        probe_info = {"title": "Probe", "live_status": "not_live"}
+    def test_quiet_error_is_returned_not_printed(self, capsys):
+        import yt_dlp
+
+        with patch("yt_dlp.YoutubeDL") as mock_cls:
+            ydl = mock_cls.return_value.__enter__.return_value
+            ydl.extract_info.side_effect = yt_dlp.utils.DownloadError("ERROR: Private video")
+            result = make_dl().download("https://example.com/v", "mp4", False, "best", "0", report=lambda e: None)
+        assert result.exit_code == 1
+        assert result.error
+        assert capsys.readouterr().err == ""
+
+    def test_report_can_cancel(self):
+        def report(event):
+            raise Cancelled
+
         with patch("yt_dlp.YoutubeDL") as mock_cls:
             ydl = mock_cls.return_value.__enter__.return_value
             ydl.prepare_filename.return_value = "/tmp/vdl_test/Video.mp4"
             ydl.extract_info.return_value = {"title": "Video", "live_status": "not_live"}
-            ydl.process_ie_result.return_value = {"title": "Video"}
-            dl = make_dl()
-            result = dl.download(
-                "https://example.com/video",
-                "mp4",
-                False,
-                "bestvideo+bestaudio/best",
-                "0",
-                info=probe_info,
-            )
-        assert result.exit_code == 0
-        ydl.extract_info.assert_called_once_with("https://example.com/video", download=False)
-        assert ydl.process_ie_result.call_args[0][0] is not probe_info
+            result = make_dl().download("https://example.com/v", "mp4", False, "best", "0", report=report)
+        assert result.exit_code == 130
 
     def test_is_live_sets_live_from_start_and_reextracts(self):
         with patch("yt_dlp.YoutubeDL") as mock_cls:

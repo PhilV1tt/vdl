@@ -87,6 +87,7 @@ _S: dict[str, dict[str, str]] = {
         # Downloader
         "fetching": "Recuperation des infos...",
         "saved": "Sauvegarde dans {path}/",
+        "saved_file": "Enregistre : {path}",
         "retry": "Erreur reseau. Nouvel essai {attempt}/{max} dans {wait}s...",
         "err_unsupported": "Site non supporte : {url}",
         "err_unsupported_hint": "  vdl --list-sites pour voir les sites supportes.",
@@ -206,6 +207,7 @@ _S: dict[str, dict[str, str]] = {
         # Downloader
         "fetching": "Fetching info...",
         "saved": "Saved to {path}/",
+        "saved_file": "Saved: {path}",
         "retry": "Network error. Retry {attempt}/{max} in {wait}s...",
         "err_unsupported": "Unsupported site: {url}",
         "err_unsupported_hint": "  vdl --list-sites to see supported sites.",
