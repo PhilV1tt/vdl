@@ -157,12 +157,12 @@ def _read_batch_file(path: str) -> list[str]:
 
 
 def _run_search(query: str) -> None:
-    """Subcommand: interactive search (delegates to interactive._search_flow)."""
+    """Subcommand: open the queue screen with this search already running."""
     from .downloader import check_deps
-    from .interactive import _search_flow
+    from .interactive import run_interactive
 
     check_deps()
-    sys.exit(_search_flow(query=query, source="youtube" if query else None))
+    run_interactive(query or None)
 
 
 def _run_config(rest: list[str]) -> None:
@@ -244,11 +244,11 @@ def main() -> None:
         return
     if raw_args and raw_args[0] == "convert":
         if len(raw_args) == 1:
-            from .interactive import _convert_flow
+            from .interactive import run_interactive
 
             if not sys.stdin.isatty():
                 _make_parser().error("Give a file: vdl convert film.mov -f mp3")
-            _convert_flow()
+            run_interactive()  # drop a file on the input line to convert it
             return
         from .convert import run_convert
 
@@ -276,10 +276,10 @@ def main() -> None:
     if args.files:
         parser.error("For several links, use vdl -b links.txt")
 
-    from .updater import auto_update_ytdlp, start_update_check
+    from .updater import auto_update_ytdlp_after_exit, start_update_check
 
     if not args.update:
-        auto_update_ytdlp()
+        auto_update_ytdlp_after_exit()
     if not (args.links or args.list_formats):
         start_update_check(__version__)
 

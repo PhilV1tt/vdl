@@ -1,4 +1,4 @@
-"""Terminal UI helpers built on questionary: cross-platform keyboard navigation."""
+"""Terminal helpers for the command-line mode: ANSI colors, spinner, success line."""
 
 from __future__ import annotations
 
@@ -68,50 +68,9 @@ def c(text: str, code: str) -> str:
 # ── Animations ─────────────────────────────────────────────────────────────
 
 
-def clear_screen() -> None:
-    """Clear the terminal (only on a TTY)."""
-    if _supports_color():
-        sys.stdout.write("\033[2J\033[H")
-        sys.stdout.flush()
-
-
-def type_print(text: str, prefix: str = "", delay: float = 0.025) -> None:
-    """Typewriter effect. Falls back to a plain print without a TTY."""
-    if not _supports_color():
-        print(prefix + text)
-        return
-    if prefix:
-        sys.stdout.write(prefix)
-        sys.stdout.flush()
-    for ch in text:
-        sys.stdout.write(ch)
-        sys.stdout.flush()
-        time.sleep(delay)
-    sys.stdout.write("\n")
-    sys.stdout.flush()
-
-
-def animate_separator(width: int = 44, color: str = "") -> None:
-    """Print a separator without delaying input."""
-    print(c(f"  {'─' * width}", color or DIM))
-
-
 def success_flash(message: str) -> None:
     """Print the completed operation once."""
     print(c(f"  ✓  {message}", GREEN))
-
-
-def fade_out(message: str, color: str = "") -> None:
-    """Print a message that fades out (bold → dim)."""
-    col = color if color else CYAN
-    if not _supports_color():
-        print(f"  {message}")
-        return
-    sys.stdout.write(f"  {BOLD}{col}{message}{RESET}\n")
-    sys.stdout.flush()
-    time.sleep(0.15)
-    sys.stdout.write(f"\033[1A\r  {DIM}{message}{RESET}\n")
-    sys.stdout.flush()
 
 
 # ── Spinner ────────────────────────────────────────────────────────────────
@@ -153,85 +112,3 @@ class Spinner:
         self._stop.set()
         if self._thread.ident is not None:
             self._thread.join(timeout=1)
-
-
-# ── Style questionary ──────────────────────────────────────────────────────
-
-try:
-    from questionary import Style as _QStyle
-
-    _STYLE: _QStyle | None = _QStyle(
-        [
-            ("qmark", "fg:#5f87ff bold"),
-            ("question", "bold"),
-            ("answer", "fg:#5fffaf bold"),
-            ("pointer", "fg:#5f87ff bold"),
-            ("highlighted", "fg:#5f87ff bold"),
-            ("selected", "fg:#5fffaf"),
-            ("separator", "fg:#666666"),
-            ("instruction", "fg:#888888"),
-        ]
-    )
-except ImportError:
-    _STYLE = None
-
-
-# ── Wrappers publics ───────────────────────────────────────────────────────
-
-
-def select(
-    message: str,
-    choices: list[str] | list[dict[str, str]],
-    default: str | None = None,
-) -> str | None:
-    """Arrow-key menu. Return the chosen value, or None if cancelled."""
-    try:
-        import questionary
-
-        result: str | None = questionary.select(message, choices=choices, default=default, style=_STYLE).ask()
-        return result
-    except (ImportError, KeyboardInterrupt, EOFError):
-        return None
-
-
-def text(message: str, default: str = "") -> str | None:
-    """Text input with keyboard history. Return None if cancelled."""
-    try:
-        import questionary
-
-        result: str | None = questionary.text(message, default=default, style=_STYLE).ask()
-        return result
-    except (ImportError, KeyboardInterrupt, EOFError):
-        return None
-
-
-def confirm(message: str, default: bool = True) -> bool:
-    """Yes/no confirmation. Return True for yes."""
-    try:
-        import questionary
-
-        result: bool | None = questionary.confirm(message, default=default, style=_STYLE).ask()
-        return bool(result) if result is not None else False
-    except (ImportError, KeyboardInterrupt, EOFError):
-        return False
-
-
-def autocomplete(message: str, choices: list[str], default: str = "") -> str | None:
-    """Input with autocompletion. Return None if cancelled."""
-    try:
-        import questionary
-
-        result: str | None = questionary.autocomplete(message, choices=choices, default=default, style=_STYLE).ask()
-        return result
-    except (ImportError, KeyboardInterrupt, EOFError):
-        return None
-
-
-def is_available() -> bool:
-    """Return True if questionary is installed."""
-    try:
-        import questionary  # noqa: F401
-
-        return True
-    except ImportError:
-        return False

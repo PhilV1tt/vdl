@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import importlib.util
 import json
 import os
@@ -186,17 +187,10 @@ def auto_update_ytdlp() -> None:
     """At most once every 24 h: install the latest yt-dlp if the installed one is older.
 
     No output and no error: on failure (network, permissions) vdl keeps the installed version.
-    Call before the first import of yt_dlp.
+    Run only where yt_dlp is not imported: vdl calls it from auto_update_ytdlp_after_exit().
     """
-    if os.environ.get("VDL_NO_AUTO_UPDATE"):
+    if os.environ.get("VDL_NO_AUTO_UPDATE") or not _ytdlp_check_due():
         return
-    try:
-        data = json.loads(_YTDLP_CACHE_PATH.read_text(encoding="utf-8"))
-        elapsed_h = (datetime.now(tz=timezone.utc) - datetime.fromisoformat(data["last_check"])).total_seconds() / 3600
-        if elapsed_h < _CHECK_INTERVAL_HOURS:
-            return
-    except (OSError, json.JSONDecodeError, KeyError, ValueError):
-        pass
     current, latest = _installed_ytdlp_version(), _latest_ytdlp_version()
     if latest is None:
         return  # no network: retry on the next launch
@@ -209,3 +203,38 @@ def auto_update_ytdlp() -> None:
         )
     except OSError:
         pass
+
+
+def _ytdlp_check_due() -> bool:
+    try:
+        data = json.loads(_YTDLP_CACHE_PATH.read_text(encoding="utf-8"))
+        elapsed_h = (datetime.now(tz=timezone.utc) - datetime.fromisoformat(data["last_check"])).total_seconds() / 3600
+        return elapsed_h >= _CHECK_INTERVAL_HOURS
+    except (OSError, json.JSONDecodeError, KeyError, ValueError):
+        return True
+
+
+# Child process: wait until vdl has exited (its parent pid changes), then update.
+# Upgrading while vdl runs could mix old and new yt-dlp modules, and doing it before
+# startup made the first launch of the day wait for PyPI and pip.
+_AFTER_EXIT = """
+import os, time
+while os.getppid() == {pid}:
+    time.sleep(1)
+from vdl.updater import auto_update_ytdlp
+auto_update_ytdlp()
+"""
+
+
+def auto_update_ytdlp_after_exit() -> None:
+    """Start a detached process that updates yt-dlp once vdl exits; the new version serves the next run."""
+    if os.environ.get("VDL_NO_AUTO_UPDATE") or not _ytdlp_check_due():
+        return
+    with contextlib.suppress(OSError):
+        subprocess.Popen(
+            [sys.executable, "-c", _AFTER_EXIT.format(pid=os.getpid())],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )

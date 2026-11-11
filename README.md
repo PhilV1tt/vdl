@@ -53,23 +53,41 @@ Run:
 vdl
 ```
 
-Paste a link: vdl shows the last settings on a single screen.
-Enter downloads, `a` starts audio, `v` starts video. The last mode used is remembered.
-Tab switches between audio and video; left/right arrows change the quality and up/down change the format.
-`d` changes the folder, `e` sets an excerpt, `o` opens the advanced options. Esc goes back to the link prompt.
-On a Mac, `m` downloads the audio and imports it into Apple Music.
-The active mode is highlighted and the settings react to keys.
-`NO_COLOR=1` turns colors off, `VDL_REDUCED_MOTION=1` turns animations off.
-Drag a local file into Terminal: vdl offers the conversion format.
-Type text: vdl searches YouTube. An empty line or Ctrl-D quits.
+Paste a link: the download starts at once with the settings shown on screen.
+Paste the next link while it runs; up to 3 items download in parallel and each one
+has its own progress line. Pasting several links at once queues them all.
+Finished items are printed above the screen with their path.
 
-The `/convert`, `/search`, `/history` and `/quit` commands are listed at startup.
-The advanced options group subtitles, SponsorBlock, metadata and cookies.
+```
+  vdl 0.9.0    VIDEO   AUDIO   Tab
+  format    mp4   mkv   webm   avi   mov    ↑↓
+  quality   best   2160   1440   1080   720   480   360    ←→
+  folder    ~/Downloads  ^O
+  ⠴ Big Buck Bunny 60fps 4K   █░░░░░░░░░  13%  25.6 MB/s  0:24
+  >
+```
+
+| Key | Action (the arrows and Tab act on settings while the input line is empty) |
+|-----|--------|
+| Tab | Switch video / audio |
+| ↑ ↓ | Format |
+| ← → | Quality |
+| Ctrl-O | Change the folder |
+| Ctrl-E | Apple Music import on/off (Mac, audio) |
+| Enter on an empty line | Download the link in the clipboard (Mac) |
+| Ctrl-R | Show the last file in Finder |
+| Ctrl-D / Ctrl-C | Quit (twice if something is still downloading) |
+
+Type text and press Enter to search YouTube; `1` to `9` queue results, several allowed, Esc closes the list.
+Drop a local file into Terminal and press Enter to convert it next to the source, to the format on screen.
+Add an excerpt after a link: `https://youtu.be/xxx 12:00-14:30`.
+`/history` shows past downloads. Settings are remembered for the next run.
+Subtitles, SponsorBlock and the other rare options are set once in the config file (see below).
+`NO_COLOR=1` turns colors off, `VDL_REDUCED_MOTION=1` turns animations off.
 
 A video link targets that video, even if YouTube adds a playlist or a radio to it.
-To download everything, use `vdl URL --playlist`. A playlist-only or channel link
-uses the same settings screen for the whole playlist. On a live stream in progress, vdl records
-from the start (Ctrl-C stops at the current moment).
+A playlist-only or channel link downloads the whole playlist. On a live stream in progress,
+vdl records from the start.
 
 ### Command mode
 
@@ -82,7 +100,7 @@ vdl -m https://youtu.be/xxx                # MP3 + Apple Music import
 vdl -b links.txt                           # Download a list of URLs
 vdl convert film.mkv -f mp3                # Convert a local file
 vdl film.mov -f mp3                        # Direct conversion, no subcommand
-vdl convert                                # Pick a file, then a format
+vdl convert                                # Open the screen, drop a file
 vdl https://youtu.be/xxx -s 12:00-14:30    # Only this excerpt
 vdl <ongoing YouTube live>                 # Record the live from its start
 ```

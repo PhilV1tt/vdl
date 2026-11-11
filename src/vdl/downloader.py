@@ -21,6 +21,20 @@ class DownloadResult:
     exit_code: int
     file_path: Path | None = None
     info: dict[str, Any] = field(default_factory=dict)
+    error: str = ""
+
+
+class Cancelled(Exception):
+    """Raised from a report callback to stop a running download."""
+
+
+class _SilentLogger:
+    """yt-dlp logger for the queue screen: nothing may write to the terminal under it."""
+
+    def debug(self, msg: str) -> None:
+        pass
+
+    info = warning = error = debug
 
 
 DEFAULT_OUTPUT = str(Path.home() / "Downloads")
@@ -35,14 +49,21 @@ _ERROR_PATTERNS: list[tuple[str, str]] = [
 ]
 
 
-def _print_error(msg: str, url: str = "") -> None:
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def error_message(msg: str, url: str = "") -> str:
+    """Turn a yt-dlp error into the user message (one or two lines)."""
     for pattern, key in _ERROR_PATTERNS:
         if pattern in msg:
-            print(t(key, url=url) if key == "err_unsupported" else t(key), file=sys.stderr)
             if key == "err_unsupported":
-                print(t("err_unsupported_hint"), file=sys.stderr)
-            return
-    print(msg.replace("ERROR: ", "").strip(), file=sys.stderr)
+                return f"{t(key, url=url)}\n{t('err_unsupported_hint')}"
+            return t(key)
+    return _ANSI.sub("", msg).replace("ERROR: ", "").strip()
+
+
+def _print_error(msg: str, url: str = "") -> None:
+    print(error_message(msg, url), file=sys.stderr)
 
 
 def check_deps() -> None:
@@ -137,47 +158,13 @@ def _parse_section(spec: str) -> tuple[float, float]:
     return _parse_timestamp(start_s), _parse_timestamp(end_s)
 
 
-def probe(url: str, *, single: bool = True) -> dict[str, Any] | None:
-    """Light extraction: full dict for a single video, flat entries for a playlist/channel.
-
-    A video link targets that video even when YouTube appends a radio or playlist.
-    """
-    import yt_dlp
-
-    opts: dict[str, Any] = {
-        "extract_flat": "in_playlist",
-        "quiet": True,
-        "no_warnings": True,
-        "noplaylist": single,
-        "socket_timeout": 10,
-        "extractor_retries": 1,
-    }
-    try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            result: dict[str, Any] | None = ydl.extract_info(url, download=False)
-            return result
-    except Exception:
-        return None
-
-
-def kind(info: dict[str, Any]) -> str:
-    """Classify a probe dict: video, playlist, live or upcoming."""
-    live_status = info.get("live_status")
-    if live_status == "is_upcoming":
-        return "upcoming"
-    if live_status == "is_live":
-        return "live"
-    return "playlist" if info.get("entries") is not None else "video"
-
-
-def _print_upcoming(info: dict[str, Any]) -> None:
+def upcoming_message(info: dict[str, Any]) -> str:
     ts = info.get("release_timestamp")
     if ts:
         from datetime import datetime
 
-        print(t("live_upcoming", when=datetime.fromtimestamp(ts).strftime("%H:%M")))
-    else:
-        print(t("err_upcoming"))
+        return t("live_upcoming", when=datetime.fromtimestamp(ts).strftime("%H:%M"))
+    return t("err_upcoming")
 
 
 def list_formats(url: str) -> int:
@@ -312,83 +299,92 @@ class Downloader:
         is_audio: bool,
         quality_selector: str,
         audio_kbps: str = "320",
-        info: dict[str, Any] | None = None,
+        report: Callable[[dict[str, Any]], None] | None = None,
     ) -> DownloadResult:
-        """`info` is only used to show the title right away (see below)."""
+        """Extract `url` once, then download it from the same YoutubeDL instance.
+
+        Without `report`, progress and messages go to the terminal. With `report`, nothing is
+        printed: report() receives {"title", "live"} once, then {"pct", "speed", "eta"} or
+        {"bytes", "speed"} (live), {"converting": True}, {"retry": n}. It may raise Cancelled.
+        """
+        import contextlib
         import time
 
         import yt_dlp
 
         from .progress import ProgressPrinter
 
+        quiet = report is not None
         printer = ProgressPrinter()
-        # A probe comes from another YoutubeDL instance. Its format URLs are tied to
-        # that session (visitor data, nsig, po_token) and YouTube answers 403 as soon as
-        # they are downloaded from another instance. So keep only the title;
-        # the info used for the download is always re-extracted below.
-        if info:
-            printer.title = str(info.get("title") or "")
         final_path: Path | None = None
         title = ""
         is_live = False
 
         def progress_hook(d: dict[str, Any]) -> None:
+            speed = d.get("speed") or 0
             if d["status"] == "downloading":
-                if not printer.title:
-                    pinfo = d.get("info_dict", {})
-                    printer.title = pinfo.get("title", "")
-                total = d.get("total_bytes") or d.get("total_bytes_estimate", 0)
-                if total and not printer.total_bytes:
-                    printer.total_bytes = total
-                downloaded = d.get("downloaded_bytes", 0)
-                speed = d.get("speed") or 0
-                if total:
+                total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+                downloaded = d.get("downloaded_bytes") or 0
+                if report is not None:
+                    if total:
+                        report({"pct": downloaded / total * 100, "speed": speed, "eta": d.get("eta") or 0})
+                    else:
+                        report({"bytes": downloaded, "speed": speed})
+                elif total:
                     printer.update(downloaded / total * 100, speed, d.get("eta") or 0)
                 else:
                     printer.update_live(downloaded, d.get("fragment_index"), d.get("fragment_count"), speed)
             elif d["status"] == "finished":
-                printer.converting()
+                if report is not None:
+                    report({"converting": True})
+                else:
+                    printer.converting()
 
         ydl_opts = self._build_ydl_opts(ext, is_audio, quality_selector, audio_kbps, progress_hook)
+        if quiet:
+            ydl_opts["logger"] = _SilentLogger()
 
         _network_errors = ("Connection", "timed out", "HTTP Error 5", "Read timed out")
 
         for attempt in range(1, self.retries + 1):
             try:
                 logger.info("Fetching info for %s", url)
-                with Spinner(t("fetching")), yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    current_info = ydl.extract_info(url, download=False)
-                    if current_info is None:
-                        return DownloadResult(1)
-
-                    live_status = current_info.get("live_status")
-                    if live_status == "is_upcoming":
-                        _print_upcoming(current_info)
-                        return DownloadResult(0)
-
-                    if live_status == "is_live" and self.live_from_start is not False:
-                        # the flag must be set before extraction to influence the format choice
-                        ydl.params["live_from_start"] = True
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    # the spinner covers extraction only, so it never overlaps the title line
+                    with contextlib.nullcontext() if quiet else Spinner(t("fetching")):
                         current_info = ydl.extract_info(url, download=False)
                         if current_info is None:
-                            return DownloadResult(1)
+                            return DownloadResult(1, error=t("err_extract"))
+                        live_status = current_info.get("live_status")
+                        if live_status == "is_live" and self.live_from_start is not False:
+                            # must be set before extraction to influence the format choice
+                            ydl.params["live_from_start"] = True
+                            current_info = ydl.extract_info(url, download=False)
+                            if current_info is None:
+                                return DownloadResult(1, error=t("err_extract"))
+
+                    if live_status == "is_upcoming":
+                        message = upcoming_message(current_info)
+                        if not quiet:
+                            print(message)
+                        return DownloadResult(0 if not quiet else 1, error=message if quiet else "")
 
                     is_live = live_status == "is_live"
+                    path_info = dict(current_info)
+                    path_info["ext"] = ext
+                    final_path = Path(ydl.prepare_filename(path_info))
+                    title = str(current_info.get("title") or "Video")
+                    printer.title = title
 
-                    _path_info = dict(current_info)
-                    _path_info["ext"] = ext
-                    final_path = Path(ydl.prepare_filename(_path_info))
-                    title = current_info.get("title", "Video") or "Video"
-                    printer.title = str(title)
-
-                    if is_live:
+                    if report is not None:
+                        report({"title": title, "live": is_live})
+                    elif is_live:
                         print(f"{BOLD}{title}{RESET}  {BOLD}{RED}● LIVE{RESET}")
                         print(c(t("live_recording"), YELLOW))
                     else:
                         duration = int(current_info.get("duration") or 0)
                         dur_str = f"{duration // 60}:{duration % 60:02d}" if duration else ""
                         print(f"{BOLD}{title}{RESET}" + (f"  {c(dur_str, DIM)}" if dur_str else ""))
-                    print()
 
                     info = ydl.process_ie_result(current_info, download=True)
 
@@ -396,11 +392,16 @@ class Downloader:
                 assert final_path is not None
                 if self.strip_metadata:
                     _strip_file_metadata(final_path)
-                success_flash(t("saved", path=self.output_dir))
+                if not quiet:
+                    success_flash(t("saved_file", path=final_path))
                 from .history import log_download
 
-                log_download(url, str(title), ext, self.output_dir, "ok")
+                log_download(url, title, ext, self.output_dir, "ok")
                 return DownloadResult(0, final_path, info or {})
+
+            except Cancelled:
+                printer.done()
+                return DownloadResult(130, error=t("err_interrupted"))
 
             except yt_dlp.utils.DownloadError as e:
                 msg = str(e)
@@ -408,13 +409,17 @@ class Downloader:
                 if is_network and attempt < self.retries:
                     printer.done()
                     wait = 2**attempt
-                    print(c(t("retry", attempt=attempt, max=self.retries - 1, wait=wait), YELLOW))
+                    if report is not None:
+                        report({"retry": attempt})
+                    else:
+                        print(c(t("retry", attempt=attempt, max=self.retries - 1, wait=wait), YELLOW))
                     time.sleep(wait)
                     printer = ProgressPrinter()
                     continue
                 printer.done()
-                _print_error(msg, url)
-                return DownloadResult(1)
+                if not quiet:
+                    _print_error(msg, url)
+                return DownloadResult(1, error=error_message(msg, url))
 
             except KeyboardInterrupt:
                 printer.done()
@@ -425,7 +430,7 @@ class Downloader:
                         from .history import log_download
 
                         log_download(url, title or "Video", ext, self.output_dir, "ok")
-                        return DownloadResult(0, final_path, info or {})
+                        return DownloadResult(0, final_path, {})
                     print(t("live_partial_kept", path=str(final_path.parent)))
                 else:
                     print(f"\n{t('err_interrupted')}")
@@ -433,7 +438,8 @@ class Downloader:
 
             except Exception as e:
                 printer.done()
-                print(f"Error: {e}", file=sys.stderr)
-                return DownloadResult(1)
+                if not quiet:
+                    print(f"Error: {e}", file=sys.stderr)
+                return DownloadResult(1, error=str(e))
 
         return DownloadResult(1)
