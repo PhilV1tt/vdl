@@ -59,9 +59,9 @@ def test_parser_no_url():
 
 def test_parser_links_flag():
     parser = _make_parser()
-    args = parser.parse_args(["@QOVESStudio", "--links"])
+    args = parser.parse_args(["@example", "--links"])
     assert args.links is True
-    assert args.url == "@QOVESStudio"
+    assert args.url == "@example"
 
 
 def test_parser_music_flag():

@@ -23,8 +23,8 @@ Examples:
   vdl https://youtu.be/xxx -a           MP3 audio
   vdl https://youtu.be/xxx -q 720       720p video
   vdl <ongoing YouTube live>            record the live from its start
-  vdl @QOVESStudio --links              list a channel's links (nothing downloaded)
-  vdl @QOVESStudio --links | vdl -b -   list, then download the whole channel
+  vdl @example --links              list a channel's links (nothing downloaded)
+  vdl @example --links | vdl -b -   list, then download the whole channel
   vdl -b links.txt                      download a list of URLs
   vdl -m https://youtu.be/xxx           MP3 + Apple Music import
   vdl convert film.mkv -f mp3           convert a local file (mp3, flac, 1080p...)

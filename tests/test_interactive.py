@@ -65,7 +65,7 @@ class TestClassify:
         "raw, kind",
         [
             (URL, "url"),
-            ("@QOVESStudio", "url"),
+            ("@example", "url"),
             ("youtu.be/abc", "url"),
             ("never gonna give you up", "search"),
             ("/history", "command"),

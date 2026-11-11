@@ -5,13 +5,10 @@ from vdl.links import extract_links, is_channel_target, normalize_channel_url
 
 class TestNormalizeChannelUrl:
     def test_bare_handle(self):
-        assert normalize_channel_url("@QOVESStudio") == "https://www.youtube.com/@QOVESStudio/videos"
+        assert normalize_channel_url("@example") == "https://www.youtube.com/@example/videos"
 
     def test_channel_url_gets_videos_tab(self):
-        assert (
-            normalize_channel_url("https://www.youtube.com/@QOVESStudio")
-            == "https://www.youtube.com/@QOVESStudio/videos"
-        )
+        assert normalize_channel_url("https://www.youtube.com/@example") == "https://www.youtube.com/@example/videos"
 
     def test_channel_id_url_gets_videos_tab(self):
         assert (
@@ -20,7 +17,7 @@ class TestNormalizeChannelUrl:
         )
 
     def test_existing_tab_untouched(self):
-        url = "https://www.youtube.com/@QOVESStudio/shorts"
+        url = "https://www.youtube.com/@example/shorts"
         assert normalize_channel_url(url) == url
 
     def test_playlist_untouched(self):
@@ -36,10 +33,10 @@ class TestNormalizeChannelUrl:
 
 class TestIsChannelTarget:
     def test_bare_handle(self):
-        assert is_channel_target("@QOVESStudio") is True
+        assert is_channel_target("@example") is True
 
     def test_channel_page_without_tab(self):
-        assert is_channel_target("https://www.youtube.com/@QOVESStudio") is True
+        assert is_channel_target("https://www.youtube.com/@example") is True
 
     def test_watch_url_is_not_channel(self):
         assert is_channel_target("https://www.youtube.com/watch?v=abc123") is False
