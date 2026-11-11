@@ -1,9 +1,9 @@
-"""Conversion de fichiers locaux avec ffmpeg : `vdl convert film.mkv -f mp3`.
+"""Convert local files with ffmpeg: `vdl convert film.mkv -f mp3`.
 
-Sortie audio : mp3 m4a aac flac wav ogg opus.  Sortie vidéo : mp4 mkv webm avi mov.
-Encodage vidéo : h264 + aac, sauf webm en vp9 + opus.
-Débit audio (`-q`) : 320 kbps par défaut, ramené au maximum de l'encodeur.  Hauteur vidéo
-(`-q`) : inchangée par défaut. Les fichiers existants sont conservés.
+Audio output: mp3 m4a aac flac wav ogg opus.  Video output: mp4 mkv webm avi mov.
+Video encoding: h264 + aac, except webm which uses vp9 + opus.
+Audio bitrate (`-q`): 320 kbps by default, capped at the encoder maximum.  Video height
+(`-q`): unchanged by default. Existing files are kept.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from .tui import BOLD, DIM, Spinner, c, success_flash
 
 AUDIO_KBPS: set[str] = {q["value"] for q in presets.AUDIO_QUALITIES}
 
-# ext -> (encodeurs ffmpeg par ordre de preference, debit max accepte en kbps ou None)
+# ext -> (ffmpeg encoders in order of preference, max accepted bitrate in kbps or None)
 _AUDIO_ENCODERS: dict[str, tuple[tuple[str, ...], int | None]] = {
     "mp3": (("libmp3lame",), 320),
     "m4a": (("aac",), None),
@@ -35,7 +35,7 @@ _AUDIO_ENCODERS: dict[str, tuple[tuple[str, ...], int | None]] = {
     "wav": (("pcm_s16le",), None),
 }
 _LOSSLESS = ("flac", "wav")
-# encodeurs natifs ffmpeg : marques experimentaux, ils ne prennent pas -b:a
+# native ffmpeg encoders: flagged experimental, they do not accept -b:a
 _NATIVE = ("vorbis", "opus")
 _PROGRESS_LINE = re.compile(r"^(size|frame)=")
 _ENCODER_FLAGS = re.compile(r"^[VAS][A-Z.]{5}$")
@@ -73,7 +73,7 @@ def is_local_target(raw: str) -> bool:
 
 @lru_cache(maxsize=1)
 def available_encoders() -> frozenset[str]:
-    """Encodeurs du binaire ffmpeg installé (`ffmpeg -encoders`)."""
+    """Encoders of the installed ffmpeg binary (`ffmpeg -encoders`)."""
     out = subprocess.run(["ffmpeg", "-hide_banner", "-encoders"], capture_output=True, text=True).stdout
     return frozenset(
         fields[1]
@@ -94,21 +94,21 @@ def _audio_args(ext: str, kbps: str) -> list[str]:
     codec = _pick_encoder(candidates)
     args = ["-c:a", codec]
     if codec in _NATIVE:
-        # -ac 2 : l'encodeur vorbis de ffmpeg ne sait pas gerer le mono
+        # -ac 2: ffmpeg's vorbis encoder cannot handle mono
         return [*args, "-strict", "-2", "-q:a", "3"] + (["-ac", "2"] if codec == "vorbis" else [])
     return [*args, "-b:a", f"{min(int(kbps), cap) if cap else int(kbps)}k"]
 
 
 def _video_args(ext: str, quality: str) -> list[str]:
     if ext == "webm":
-        # vp9 est 10x plus lent que h264 : on garde -cpu-used 4 pour rester sous quelques minutes
+        # vp9 is 10x slower than h264: keep -cpu-used 4 to stay within a few minutes
         args = ["-c:v", "libvpx-vp9", "-crf", "32", "-b:v", "0", "-deadline", "good", "-cpu-used", "4"]
         audio_args = _audio_args("opus", "192")
     else:
         args = ["-c:v", "libx264", "-preset", "medium", "-crf", "20"]
         audio_args = _audio_args("m4a", "192")
     if quality in presets.QUALITY_KEYS and quality != "best":
-        args += ["-vf", f"scale=-2:{quality}"]  # -2 = largeur paire, garde le ratio
+        args += ["-vf", f"scale=-2:{quality}"]  # -2 = even width, keeps the aspect ratio
     return [*args, *audio_args]
 
 
@@ -117,7 +117,7 @@ def build_command(src: Path, dst: Path, ext: str, quality: str) -> list[str]:
         raise ValueError(f"format inconnu : {ext}")
     is_audio = ext in presets.AUDIO_EXTS
     cmd = ["ffmpeg", "-y", "-hide_banner", "-nostdin", "-i", str(src)]
-    # une pochette d'album est un flux vidéo : on ne le garde pas dans un fichier audio
+    # cover art is a video stream: do not keep it in an audio file
     cmd += ["-vn"] if is_audio else ["-map", "0:v:0", "-map", "0:a:0?"]
     cmd += _audio_args(ext, quality) if is_audio else _video_args(ext, quality)
     return [*cmd, str(dst)]
@@ -125,16 +125,16 @@ def build_command(src: Path, dst: Path, ext: str, quality: str) -> list[str]:
 
 def _ffmpeg_error(stderr: str, returncode: int) -> str:
     lines = [line for line in stderr.splitlines() if line.strip() and not _PROGRESS_LINE.match(line)]
-    return " | ".join(lines[-2:]) or f"ffmpeg a retourne {returncode}"
+    return " | ".join(lines[-2:]) or f"ffmpeg returned {returncode}"
 
 
 def convert_one(src: Path, dst: Path, ext: str, quality: str) -> None:
-    """Convertit un fichier ; lève RuntimeError avec la fin de la sortie ffmpeg en cas d'échec."""
+    """Convert one file; raise RuntimeError with the end of ffmpeg's output on failure."""
     dst.parent.mkdir(parents=True, exist_ok=True)
     if src.resolve() == dst.resolve():
-        raise RuntimeError(f"La sortie ne peut pas remplacer la source : {src}")
+        raise RuntimeError(f"The output cannot replace the source : {src}")
     if dst.exists():
-        raise RuntimeError(f"Le fichier de sortie existe déjà : {dst}")
+        raise RuntimeError(f"The output file already exists : {dst}")
     with TemporaryDirectory(prefix=".vdl-", dir=dst.parent) as folder:
         partial = Path(folder) / dst.name
         done = subprocess.run(build_command(src, partial, ext, quality), capture_output=True, text=True)
@@ -154,7 +154,7 @@ def output_path(src: Path, ext: str, output_dir: str | None) -> Path:
 
 
 def convert_files(files: list[str], ext: str, quality: str, output_dir: str | None) -> int:
-    """Convertit chaque fichier, un par un. Retourne 0 si tous ont réussi."""
+    """Convert each file in turn. Return 0 if all succeeded."""
     ok = fail = 0
     for raw in files:
         src = local_path(raw)
@@ -181,30 +181,28 @@ def convert_files(files: list[str], ext: str, quality: str, output_dir: str | No
 def _make_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="vdl convert",
-        description="Convertit un fichier video/audio local vers un autre format video/audio (ffmpeg)",
+        description="Convert a local video/audio file to another video/audio format (ffmpeg)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
-Exemples :
-  vdl convert film.mkv -f mp3          audio MP3 320 kbps
-  vdl convert a.wav -f flac           audio FLAC sans perte
-  vdl convert reel.mov -f mp4 -q 1080  video MP4 ramenee a 1080p
-  vdl convert *.mp4 -f mp3 -o ~/Music  plusieurs fichiers, dossier de sortie
+Examples:
+  vdl convert film.mkv -f mp3          MP3 audio, 320 kbps
+  vdl convert a.wav -f flac           lossless FLAC audio
+  vdl convert reel.mov -f mp4 -q 1080  MP4 video scaled to 1080p
+  vdl convert *.mp4 -f mp3 -o ~/Music  several files, output folder
 
-Formats audio : mp3 m4a aac flac wav ogg opus
-Formats video : mp4 mkv webm avi mov
+Audio formats: mp3 m4a aac flac wav ogg opus
+Video formats: mp4 mkv webm avi mov
 """,
     )
-    p.add_argument("files", nargs="+", help="Fichier(s) a convertir")
-    p.add_argument("-f", "--format", metavar="FMT", help="Format de sortie (defaut: mp3, ou le dernier choix audio)")
-    p.add_argument(
-        "-q", "--quality", metavar="Q", help="Video : 2160 1440 1080 720 480 360  |  Audio : 320 256 192 128"
-    )
-    p.add_argument("-o", "--output", metavar="DOSSIER", help="Dossier de sortie (defaut: a cote de la source)")
+    p.add_argument("files", nargs="+", help="File(s) to convert")
+    p.add_argument("-f", "--format", metavar="FMT", help="Output format (default: mp3, or the last audio choice)")
+    p.add_argument("-q", "--quality", metavar="Q", help="Video: 2160 1440 1080 720 480 360  |  Audio : 320 256 192 128")
+    p.add_argument("-o", "--output", metavar="DIR", help="Output folder (default: next to the source)")
     return p
 
 
 def resolve_format_and_quality(args: argparse.Namespace) -> tuple[str, str]:
-    """Résout (format, qualité) et valide les deux. Lève SystemExit si l'un est inconnu."""
+    """Resolve (format, quality) and validate both. Raise SystemExit if either is unknown."""
     from .config import load_config
     from .prefs import recall
 
@@ -224,13 +222,13 @@ def resolve_format_and_quality(args: argparse.Namespace) -> tuple[str, str]:
 
 
 def run_convert(argv: list[str]) -> int:
-    """Point d'entree du sous-commande `vdl convert`."""
+    """Entry point of the `vdl convert` subcommand."""
     import shutil
 
     args = _make_parser().parse_intermixed_args(argv)
     ext, quality = resolve_format_and_quality(args)
     if not shutil.which("ffmpeg"):
-        print("ffmpeg est nécessaire pour convertir. Installation : brew install ffmpeg (macOS).", file=sys.stderr)
+        print("ffmpeg is required to convert. Install it with: brew install ffmpeg (macOS).", file=sys.stderr)
         return 1
     try:
         return convert_files(args.files, ext, quality, args.output)

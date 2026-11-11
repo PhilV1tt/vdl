@@ -1,43 +1,43 @@
-# vdl — Installateur Windows
-# Usage : powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/PhilV1tt/vdl/main/install-windows.ps1 | iex"
+# vdl — Windows installer
+# Usage: powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/PhilV1tt/vdl/main/install-windows.ps1 | iex"
 
 $ErrorActionPreference = "Stop"
 
 Write-Host ""
 Write-Host "╔══════════════════════════════════════════╗"
-Write-Host "║   Installation de vdl                    ║"
+Write-Host "║   Installing vdl                         ║"
 Write-Host "╚══════════════════════════════════════════╝"
 Write-Host ""
 
-# ── Fonctions utilitaires ──────────────────────────────────────────────────
+# ── Helper functions ──────────────────────────────────────────────────
 
 function Test-Command($name) {
     return [bool](Get-Command $name -ErrorAction SilentlyContinue)
 }
 
 function Install-Winget-Package($id, $label) {
-    Write-Host "→ Installation de $label..."
+    Write-Host "→ Installing $label..."
     winget install --id $id --silent --accept-package-agreements --accept-source-agreements
 }
 
 # ── 1. winget ─────────────────────────────────────────────────────────────
 
 if (-not (Test-Command "winget")) {
-    Write-Host "❌ winget n'est pas disponible." -ForegroundColor Red
-    Write-Host "   Installe 'App Installer' depuis le Microsoft Store et relance ce script."
+    Write-Host "❌ winget is not available." -ForegroundColor Red
+    Write-Host "   Install 'App Installer' from the Microsoft Store and run this script again."
     exit 1
 }
-Write-Host "✓ winget disponible"
+Write-Host "✓ winget available"
 
 # ── 2. Python ─────────────────────────────────────────────────────────────
 
 if (-not (Test-Command "python")) {
     Install-Winget-Package "Python.Python.3.12" "Python 3.12"
-    # Recharger le PATH
+    # Reload PATH
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + `
                 [System.Environment]::GetEnvironmentVariable("Path", "User")
 } else {
-    Write-Host "✓ Python déjà installé"
+    Write-Host "✓ Python already installed"
 }
 
 # ── 3. ffmpeg ─────────────────────────────────────────────────────────────
@@ -47,35 +47,35 @@ if (-not (Test-Command "ffmpeg")) {
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + `
                 [System.Environment]::GetEnvironmentVariable("Path", "User")
 } else {
-    Write-Host "✓ ffmpeg déjà installé"
+    Write-Host "✓ ffmpeg already installed"
 }
 
 # ── 4. pipx ───────────────────────────────────────────────────────────────
 
 if (-not (Test-Command "pipx")) {
-    Write-Host "→ Installation de pipx..."
+    Write-Host "→ Installing pipx..."
     python -m pip install --user pipx
     python -m pipx ensurepath
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + $env:Path
 } else {
-    Write-Host "✓ pipx déjà installé"
+    Write-Host "✓ pipx already installed"
 }
 
 # ── 5. vdl ────────────────────────────────────────────────────────────────
 
-Write-Host "→ Installation de vdl..."
+Write-Host "→ Installing vdl..."
 pipx install "git+https://github.com/PhilV1tt/vdl.git"
 
 Write-Host ""
 Write-Host "╔══════════════════════════════════════════╗"
-Write-Host "║   ✅  vdl est installé !                 ║"
+Write-Host "║   ✅  vdl is installed!                  ║"
 Write-Host "╚══════════════════════════════════════════╝"
 Write-Host ""
-Write-Host "  Utilisation :"
-Write-Host "    vdl                        → mode interactif (navigation flèches)"
-Write-Host "    vdl https://youtu.be/xxx   → télécharger une vidéo"
-Write-Host "    vdl https://... --audio    → extraire l'audio en MP3"
-Write-Host "    vdl search ""lofi hip hop"" → rechercher sur YouTube"
+Write-Host "  Usage:"
+Write-Host "    vdl                        → interactive mode (arrow-key navigation)"
+Write-Host "    vdl https://youtu.be/xxx   → download a video"
+Write-Host "    vdl https://... --audio    → extract the audio as MP3"
+Write-Host "    vdl search ""lofi hip hop"" → search YouTube"
 Write-Host ""
-Write-Host "  ⚠  Ouvre un nouveau terminal si la commande vdl n'est pas reconnue."
+Write-Host "  ⚠  Open a new terminal if the vdl command is not recognized."
 Write-Host ""

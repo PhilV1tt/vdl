@@ -34,7 +34,7 @@ SOURCES = {
 
 
 def search_videos(query: str, source: str = "youtube", n: int = 10) -> list[dict[str, object]]:
-    """Cherche des vidéos via yt-dlp et retourne une liste de résultats."""
+    """Search videos through yt-dlp and return a list of results."""
     import yt_dlp
 
     prefix = SOURCES.get(source, "ytsearch")
@@ -50,7 +50,7 @@ def search_videos(query: str, source: str = "youtube", n: int = 10) -> list[dict
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(search_url, download=False)
     except Exception as e:
-        print(f"❌  Erreur lors de la recherche : {e}", file=sys.stderr)
+        print(f"❌  Search failed : {e}", file=sys.stderr)
         return []
 
     entries = info.get("entries", []) if info else []

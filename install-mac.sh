@@ -3,60 +3,60 @@ set -e
 
 echo ""
 echo "╔══════════════════════════════════════════╗"
-echo "║   Installation de vdl                    ║"
+echo "║   Installing vdl                         ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
 
 # 1. Homebrew
 if ! command -v brew &>/dev/null; then
-    echo "→ Installation de Homebrew..."
+    echo "→ Installing Homebrew..."
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    # Ajouter brew au PATH pour les Macs Apple Silicon
+    # Add brew to PATH on Apple Silicon Macs
     if [ -f /opt/homebrew/bin/brew ]; then
         eval "$(/opt/homebrew/bin/brew shellenv)"
     fi
 else
-    echo "✓ Homebrew déjà installé"
+    echo "✓ Homebrew already installed"
 fi
 
 # 2. Python
 if ! command -v python3 &>/dev/null; then
-    echo "→ Installation de Python..."
+    echo "→ Installing Python..."
     brew install python
 else
-    echo "✓ Python déjà installé"
+    echo "✓ Python already installed"
 fi
 
 # 3. ffmpeg
 if ! command -v ffmpeg &>/dev/null; then
-    echo "→ Installation de ffmpeg..."
+    echo "→ Installing ffmpeg..."
     brew install ffmpeg
 else
-    echo "✓ ffmpeg déjà installé"
+    echo "✓ ffmpeg already installed"
 fi
 
 # 4. pipx
 if ! command -v pipx &>/dev/null; then
-    echo "→ Installation de pipx..."
+    echo "→ Installing pipx..."
     brew install pipx
     pipx ensurepath
 else
-    echo "✓ pipx déjà installé"
+    echo "✓ pipx already installed"
 fi
 
 # 5. vdl
-echo "→ Installation de vdl..."
+echo "→ Installing vdl..."
 pipx install "git+https://github.com/PhilV1tt/vdl.git"
 
 echo ""
 echo "╔══════════════════════════════════════════╗"
-echo "║   ✅  vdl est installé !                 ║"
+echo "║   ✅  vdl is installed!                  ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
-echo "  Utilisation :"
-echo "    vdl                        → mode interactif (le plus simple)"
-echo "    vdl https://youtu.be/xxx   → télécharger une vidéo"
-echo "    vdl https://... --audio    → extraire l'audio en MP3"
+echo "  Usage:"
+echo "    vdl                        → interactive mode (the easiest)"
+echo "    vdl https://youtu.be/xxx   → download a video"
+echo "    vdl https://... --audio    → extract the audio as MP3"
 echo ""
-echo "  Relance un nouveau Terminal si la commande vdl n'est pas trouvée."
+echo "  Open a new Terminal if the vdl command is not found."
 echo ""

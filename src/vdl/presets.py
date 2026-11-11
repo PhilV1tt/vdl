@@ -17,7 +17,7 @@ VIDEO_FORMATS = [
 ]
 
 VIDEO_QUALITIES = [
-    {"label": "Meilleure qualité", "value": "bestvideo+bestaudio/best"},
+    {"label": "Best quality", "value": "bestvideo+bestaudio/best"},
     {"label": "4K (2160p)", "value": "bestvideo[height<=2160]+bestaudio/best[height<=2160]"},
     {"label": "2K (1440p)", "value": "bestvideo[height<=1440]+bestaudio/best[height<=1440]"},
     {"label": "1080p", "value": "bestvideo[height<=1080]+bestaudio/best[height<=1080]"},
@@ -43,7 +43,7 @@ ALL_EXTS: set[str] = AUDIO_EXTS | VIDEO_EXTS
 
 
 def build_quality_selector(is_audio: bool, quality_key: str = "best") -> tuple[str, str]:
-    """Retourne (quality_selector, audio_kbps) pour yt-dlp."""
+    """Return (quality_selector, audio_kbps) for yt-dlp."""
     if is_audio:
         return "bestaudio/best", quality_key if quality_key in {q["value"] for q in AUDIO_QUALITIES} else "320"
     return VIDEO_QUALITY_MAP.get(quality_key, "bestvideo+bestaudio/best"), "0"

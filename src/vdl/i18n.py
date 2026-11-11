@@ -1,4 +1,4 @@
-"""Internationalisation minimale : détection automatique FR/EN."""
+"""Minimal i18n: automatic FR/EN detection."""
 
 from __future__ import annotations
 
@@ -258,6 +258,6 @@ _S: dict[str, dict[str, str]] = {
 
 
 def t(key: str, **kwargs: object) -> str:
-    """Retourne la chaîne traduite pour la langue détectée."""
+    """Return the string translated into the detected language."""
     s = _S.get(LANG, _S["en"]).get(key, key)
     return s.format(**kwargs) if kwargs else s

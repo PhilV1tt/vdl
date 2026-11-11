@@ -47,9 +47,9 @@ def test_progress_printer_done_no_active(capsys):
 def test_progress_printer_done_with_message(capsys):
     pp = ProgressPrinter()
     pp._active = True
-    pp.done("Terminé")
+    pp.done("Done")
     captured = capsys.readouterr()
-    assert "Terminé" in captured.out
+    assert "Done" in captured.out
 
 
 def test_update_live_marks_active(capsys, monkeypatch):

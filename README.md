@@ -1,14 +1,14 @@
-# vdl - Téléchargeur universel de vidéos
+# vdl - Universal video downloader
 
-Fait avec amour pour Julien :))))
+Made with love for Julien :))))
 
-Téléchargez des vidéos et de l'audio depuis YouTube, Vimeo, TikTok, SoundCloud et [1000+ autres sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md).
+Download video and audio from YouTube, Vimeo, TikTok, SoundCloud and [1000+ other sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md).
 
 ## Installation
 
 ### macOS
 
-Collez cette commande dans le Terminal et appuyez sur Entrée :
+Paste this command into Terminal and press Enter:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/PhilV1tt/vdl/main/install-mac.sh)
@@ -17,176 +17,183 @@ bash <(curl -fsSL https://raw.githubusercontent.com/PhilV1tt/vdl/main/install-ma
 ### Linux
 
 ```bash
-# 1. Installer pipx si pas déjà installé
+# 1. Install pipx if needed
 sudo apt install pipx        # Debian/Ubuntu
 sudo dnf install pipx        # Fedora
 sudo pacman -S python-pipx   # Arch
 
 pipx ensurepath
 
-# 2. Installer ffmpeg
+# 2. Install ffmpeg
 sudo apt install ffmpeg      # Debian/Ubuntu
 sudo dnf install ffmpeg      # Fedora
 sudo pacman -S ffmpeg        # Arch
 
-# 3. Installer vdl
+# 3. Install vdl
 pipx install git+https://github.com/PhilV1tt/vdl.git
 ```
 
 ### Windows
 
-Collez cette commande dans PowerShell (en tant qu'administrateur) :
+Paste this command into PowerShell (as administrator):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/PhilV1tt/vdl/main/install-windows.ps1 | iex"
 ```
 
-Le script installe automatiquement Python, ffmpeg et vdl via winget.
+The script installs Python, ffmpeg and vdl through winget.
 
-## Utilisation
+## Usage
 
-### Mode interactif (le plus simple)
+### Interactive mode (the easiest)
 
-Lancez simplement :
+Run:
 
 ```bash
 vdl
 ```
 
-Colle un lien directement : vdl affiche les derniers réglages sur un seul écran.
-Entrée télécharge, `a` lance l'audio, `v` la vidéo. Le dernier mode utilisé est retenu.
-Tab bascule audio/vidéo ; les flèches gauche/droite changent la qualité et haut/bas le format.
-`d` change le dossier, `e` l'extrait, `o` ouvre les options avancées. Échap revient à la saisie du lien.
-Sur Mac, `m` télécharge l'audio puis l'importe dans Apple Music.
-Le mode actif est surligné ; les réglages réagissent aux touches.
-`NO_COLOR=1` désactive les couleurs, `VDL_REDUCED_MOTION=1` désactive les animations.
-Glisse un fichier local dans le Terminal : vdl propose le format de conversion.
-Tape du texte : vdl cherche sur YouTube. Entrée vide ou Ctrl-D quitte.
+Paste a link: vdl shows the last settings on a single screen.
+Enter downloads, `a` starts audio, `v` starts video. The last mode used is remembered.
+Tab switches between audio and video; left/right arrows change the quality and up/down change the format.
+`d` changes the folder, `e` sets an excerpt, `o` opens the advanced options. Esc goes back to the link prompt.
+On a Mac, `m` downloads the audio and imports it into Apple Music.
+The active mode is highlighted and the settings react to keys.
+`NO_COLOR=1` turns colors off, `VDL_REDUCED_MOTION=1` turns animations off.
+Drag a local file into Terminal: vdl offers the conversion format.
+Type text: vdl searches YouTube. An empty line or Ctrl-D quits.
 
-Les commandes `/convert`, `/search`, `/history` et `/quit` sont affichées au démarrage.
-Les options avancées regroupent sous-titres, SponsorBlock, métadonnées et cookies.
+The `/convert`, `/search`, `/history` and `/quit` commands are listed at startup.
+The advanced options group subtitles, SponsorBlock, metadata and cookies.
 
-Un lien vidéo cible cette vidéo, même si YouTube y ajoute une playlist ou une radio.
-Pour tout télécharger, utilise `vdl URL --playlist`. Un lien de playlist seule ou de chaîne
-utilise le même écran de réglages pour la playlist entière. Sur un live en cours, vdl enregistre
-depuis le début (Ctrl-C pour arrêter à l'instant présent).
+A video link targets that video, even if YouTube adds a playlist or a radio to it.
+To download everything, use `vdl URL --playlist`. A playlist-only or channel link
+uses the same settings screen for the whole playlist. On a live stream in progress, vdl records
+from the start (Ctrl-C stops at the current moment).
 
-### Mode commande
+### Command mode
 
 ```bash
-vdl https://youtu.be/xxx                   # Vidéo MP4, meilleure qualité
-vdl https://youtu.be/xxx -a                # Audio MP3
-vdl https://youtu.be/xxx -a -f flac        # Audio FLAC
-vdl https://youtu.be/xxx -q 1080           # Vidéo 1080p
-vdl -m https://youtu.be/xxx                # MP3 + import Apple Music
-vdl -b liens.txt                           # Télécharger une liste d'URLs
-vdl convert film.mkv -f mp3                # Convertir un fichier local
-vdl film.mov -f mp3                        # Conversion directe, sans sous-commande
-vdl convert                               # Choisir un fichier puis un format
-vdl https://youtu.be/xxx -s 12:00-14:30    # Juste cet extrait
-vdl <live YouTube en cours>                # Enregistre depuis le début du live
+vdl https://youtu.be/xxx                   # MP4 video, best quality
+vdl https://youtu.be/xxx -a                # MP3 audio
+vdl https://youtu.be/xxx -a -f flac        # FLAC audio
+vdl https://youtu.be/xxx -q 1080           # 1080p video
+vdl -m https://youtu.be/xxx                # MP3 + Apple Music import
+vdl -b links.txt                           # Download a list of URLs
+vdl convert film.mkv -f mp3                # Convert a local file
+vdl film.mov -f mp3                        # Direct conversion, no subcommand
+vdl convert                                # Pick a file, then a format
+vdl https://youtu.be/xxx -s 12:00-14:30    # Only this excerpt
+vdl <ongoing YouTube live>                 # Record the live from its start
 ```
 
-### Convertir un fichier local
+### Convert a local file
 
-`convert` transforme un fichier déjà sur le disque, sans passer par un site. La sortie
-porte le nom de la source ; `-o` change le dossier.
-La sous-commande `convert` est facultative : `vdl film.mkv -f mp3` fonctionne aussi.
-Sans argument, `vdl convert` demande un fichier et son format de sortie.
+`convert` transforms a file already on disk, without going through a site. The output
+keeps the source name; `-o` changes the folder.
+The `convert` subcommand is optional: `vdl film.mkv -f mp3` works too.
+With no argument, `vdl convert` asks for a file and an output format.
 
 ```bash
 vdl convert film.mkv -f mp3             # MP3 320 kbps
-vdl convert podcast.wav -f flac         # FLAC, sans perte
-vdl convert reel.mov -f mp4 -q 1080     # MP4 ramené à 1080p
-vdl convert *.mp4 -f mp3 -o ~/Music     # plusieurs fichiers d'un coup
+vdl convert podcast.wav -f flac         # FLAC, lossless
+vdl convert reel.mov -f mp4 -q 1080     # MP4 scaled to 1080p
+vdl convert *.mp4 -f mp3 -o ~/Music     # several files at once
 ```
 
 | Option | Description |
 |--------|-------------|
-| `-f FORMAT` | Sortie : `mp3` `m4a` `aac` `flac` `wav` `ogg` `opus` (vidéo : `mp4` `mkv` `webm` `avi` `mov`) |
-| `-q Q` | Audio : `320` `256` `192` `128` kbps.  Vidéo : hauteur `2160` `1440` `1080` `720` `480` `360` |
-| `-o DOSSIER` | Dossier de sortie (défaut : à côté de la source) |
+| `-f FORMAT` | Output: `mp3` `m4a` `aac` `flac` `wav` `ogg` `opus` (video: `mp4` `mkv` `webm` `avi` `mov`) |
+| `-q Q` | Audio: `320` `256` `192` `128` kbps.  Video: height `2160` `1440` `1080` `720` `480` `360` |
+| `-o DIR` | Output folder (default: next to the source) |
 
-Sans `-f`, la sortie est le dernier format audio choisi, ou MP3. L'encodage est h264 + AAC,
-VP9 + Opus pour WebM. Si le nom de sortie existe, vdl ajoute un suffixe (`film (1).mp3`).
-La source est conservée, y compris pour une conversion vers le même format.
-Un échec ne laisse pas de fichier partiel.
+Without `-f`, the output is the last audio format chosen, or MP3. Encoding is h264 + AAC,
+VP9 + Opus for WebM. If the output name exists, vdl adds a suffix (`film (1).mp3`).
+The source is always kept, including when converting to the same format.
+A failure leaves no partial file.
 
-En mode interactif, colle un chemin ou utilise `/convert`.
+In interactive mode, paste a path or use `/convert`.
 
 ### Options
 
 | Option | Description |
 |--------|-------------|
-| `-a` / `--audio` | Extraire l'audio (MP3 par défaut) |
-| `-q QUALITÉ` | Qualité vidéo : `best`, `1080`, `720`, `480`, `360` |
-| `-f FORMAT` | Format : `mp3`, `m4a`, `flac`, `wav`, `mp4`, `mkv`… |
-| `-o DOSSIER` | Dossier de destination (défaut : `~/Downloads`) |
-| `-p` / `--playlist` | Télécharger une playlist / chaîne entière |
-| `-b FICHIER` | Fichier d'URLs, une par ligne (`-` = entrée standard) |
-| `--links` | Lister les liens d'une chaîne/playlist, sans télécharger |
-| `-m` / `--music` | MP3 + import dans Apple Music |
-| `-s DÉBUT-FIN` | Extrait, ex `12:00-14:30` (répétable) |
-| `--cookies-from-browser NAVIGATEUR` | Cookies depuis chrome/safari/firefox/edge/brave (contenu privé/membres/âge) |
-| `--live-from-start` / `--no-live-from-start` | Force ou désactive l'enregistrement d'un live depuis son début (défaut : auto-détecté) |
-| `-F` / `--list-formats` | Lister les formats disponibles pour une URL |
-| `--format-id ID` | Télécharger un format yt-dlp précis (voir `-F`) |
-| `--subs [LANGUE]` | Sous-titres (langue optionnelle) |
-| `--sponsorblock` / `--no-sponsorblock` | Force ou désactive SponsorBlock |
-| `--list-sites` | Afficher les 1000+ sites supportés |
+| `-a` / `--audio` | Extract the audio (MP3 by default) |
+| `-q QUALITY` | Video quality: `best`, `1080`, `720`, `480`, `360` |
+| `-f FORMAT` | Format: `mp3`, `m4a`, `flac`, `wav`, `mp4`, `mkv`... |
+| `-o DIR` | Destination folder (default: `~/Downloads`) |
+| `-p` / `--playlist` | Download a whole playlist / channel |
+| `-b FILE` | File of URLs, one per line (`-` = standard input) |
+| `--links` | List the links of a channel/playlist, without downloading |
+| `-m` / `--music` | MP3 + import into Apple Music |
+| `-s START-END` | Excerpt, e.g. `12:00-14:30` (repeatable) |
+| `--cookies-from-browser BROWSER` | Cookies from chrome/safari/firefox/edge/brave (private / members-only / age-restricted content) |
+| `--live-from-start` / `--no-live-from-start` | Force or disable recording a live stream from its start (default: auto-detected) |
+| `-F` / `--list-formats` | List the formats available for a URL |
+| `--format-id ID` | Download a specific yt-dlp format (see `-F`) |
+| `--subs [LANG]` | Subtitles (optional language) |
+| `--sponsorblock` / `--no-sponsorblock` | Force or disable SponsorBlock |
+| `--list-sites` | Show the 1000+ supported sites |
 
-### Direct (live)
+### Live streams
 
-vdl détecte tout seul un live en cours et enregistre depuis son début. Il n'existe pas de moyen natif d'arrêter automatiquement "à l'instant présent" : Ctrl-C est le seul point d'arrêt, et vdl recolle alors les fragments déjà reçus en un fichier lisible.
+vdl detects a live stream in progress and records it from its start. There is no built-in way to stop automatically at the current moment: Ctrl-C is the only stop point, and vdl then joins the fragments already received into a playable file.
 
-Sur un live qui tourne en continu depuis longtemps (une caméra 24/7, par exemple), "depuis le début" peut représenter une quantité de données énorme. Vérifie que c'est bien ce que tu veux avant de lancer un enregistrement long, et laisse tourner le temps qu'il faut avant le Ctrl-C.
+On a live stream that has been running for a long time (a 24/7 camera, for example), "from the start" can mean a huge amount of data. Check that this is what you want before starting a long recording, and let it run as long as needed before pressing Ctrl-C.
 
-### Récupérer tous les liens d'une chaîne
+### Get every link of a channel
 
-`--links` sort une URL par ligne sur la sortie standard, sans rien télécharger.
-Un `@handle` seul est complété automatiquement.
+`--links` prints one URL per line on standard output, without downloading anything.
+A bare `@handle` is completed automatically.
 
 ```bash
-vdl @QOVESStudio --links                   # Affiche tous les liens de la chaîne
-vdl @QOVESStudio --links > liens.txt        # Enregistre la liste (à trier/filtrer)
-vdl -b liens.txt                            # Télécharge ce qu'on a gardé
-vdl @QOVESStudio --links | vdl -b -         # Tout en une passe
+vdl @QOVESStudio --links                   # Print every link of the channel
+vdl @QOVESStudio --links > links.txt       # Save the list (to sort/filter)
+vdl -b links.txt                           # Download what you kept
+vdl @QOVESStudio --links | vdl -b -        # Everything in one pass
 ```
 
-### Réglages persistants
+### Persistent settings
 
-vdl retient automatiquement la dernière qualité et le dernier format, séparément pour
-l'audio et la vidéo. Le dossier choisi en mode interactif est également retenu
-la prochaine fois. `vdl config` affiche les valeurs effectives et leur origine
-(mémoire ou config), `vdl config reset` oublie la mémoire.
+vdl remembers the last quality and format, separately for audio and video.
+The folder chosen in interactive mode is remembered for next time as well. `vdl config`
+shows the effective values and where they come from (memory or config);
+`vdl config reset` forgets the memory.
 
-En ligne de commande, `-o` ne change le dossier que pour cette exécution.
+On the command line, `-o` changes the folder for that run only.
 
-Les options moins courantes se règlent une fois dans `~/.config/vdl/config.toml`
-(au lieu d'un flag à chaque commande) :
+Less common options are set once in `~/.config/vdl/config.toml`
+(instead of a flag on every command):
 
 ```toml
-subs = true              # Télécharger et embarquer les sous-titres
-subs_lang = "fr"         # Langue des sous-titres
-sponsorblock = true      # Supprimer les segments SponsorBlock
-embed_thumbnail = true   # Embarquer la miniature
+subs = true              # Download and embed subtitles
+subs_lang = "fr"         # Subtitle language
+sponsorblock = true      # Remove SponsorBlock segments
+embed_thumbnail = true   # Embed the thumbnail
 output_template = "%(title)s.%(ext)s"
-concurrent_fragments = 4 # Fragments telechargés en parallèle (vidéos/lives longs)
-aria2c = false           # Déléguer le téléchargement à aria2c (brew install aria2)
+concurrent_fragments = 4 # Fragments downloaded in parallel (long videos/lives)
+aria2c = false           # Hand the download to aria2c (brew install aria2)
 ```
 
-Sur les vidéos longues et les lives, vdl télécharge déjà 4 fragments en parallèle
-par défaut (plus rapide qu'un fragment à la fois). Pour aller plus loin, installe
-`aria2c` et passe `aria2c = true` : yt-dlp lui délègue le téléchargement, généralement
-le plus rapide.
+On long videos and live streams, vdl already downloads 4 fragments in parallel
+by default (faster than one at a time). To go further, install
+`aria2c` and set `aria2c = true`: yt-dlp hands the download to it, usually
+the fastest option.
 
-## Mise à jour
+## Updates
+
+yt-dlp updates itself: at most once every 24 hours, at launch, vdl compares the installed
+yt-dlp with PyPI and upgrades it silently (with `pip`, or `uv pip` when the environment has
+no pip, as with `uv tool`). If the network or the install fails, vdl keeps the installed
+version and prints nothing. Set `VDL_NO_AUTO_UPDATE=1` to turn this off.
+
+To update vdl itself and yt-dlp by hand:
 
 ```bash
 vdl --update
 ```
 
-## Désinstallation
+## Uninstall
 
 ```bash
 pipx uninstall vdl        # macOS / Linux

@@ -1,4 +1,4 @@
-"""Tests pour la mémoire des préférences (explicite > mémoire > config > défaut)."""
+"""Tests of the preferences memory (explicit > memory > config > default)."""
 
 from vdl import prefs
 from vdl.config import VdlConfig

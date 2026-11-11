@@ -1,4 +1,4 @@
-"""Tests du mode interactif (prompt-toolkit piloté par un pipe clavier, probe et Downloader mockés)."""
+"""Tests of the interactive mode (prompt-toolkit driven by a keyboard pipe, probe and Downloader mocked)."""
 
 from unittest.mock import patch
 
@@ -20,14 +20,14 @@ URL = "https://example.com/video"
 
 @pytest.fixture(autouse=True)
 def _no_real_prefs_or_config(monkeypatch):
-    """Config par défaut, mémoire vide, remember() en no-op : chaque test part d'un état neutre."""
+    """Default config, empty memory, remember() as a no-op: every test starts from a neutral state."""
     monkeypatch.setattr("vdl.interactive.load_config", lambda: VdlConfig())
     monkeypatch.setattr("vdl.prefs.recall", dict)
     monkeypatch.setattr("vdl.prefs.remember", lambda *a, **k: None)
 
 
 def run_flow(keys, info=VIDEO_INFO, exit_code=0, url=URL, **patches):
-    """Envoie `keys` à l'écran unique et retourne (code de sortie, mock Downloader)."""
+    """Send `keys` to the single screen and return (exit code, Downloader mock)."""
     with (
         create_pipe_input() as keyboard,
         create_app_session(input=keyboard, output=DummyOutput()),
@@ -98,7 +98,7 @@ class TestOptionsScreen:
     def test_custom_title_via_metadata_row(self):
         with (
             patch("vdl.interactive.select", side_effect=["meta", "back"]),
-            patch("vdl.interactive.confirm", return_value=False),  # nettoyer les métadonnées ? non
+            patch("vdl.interactive.confirm", return_value=False),  # clean the metadata? no
             patch("vdl.interactive.text", return_value="Mon Titre"),
         ):
             rc, downloader = run_flow("o")
@@ -154,7 +154,7 @@ class TestConvertFlow:
             patch("vdl.interactive.select", return_value="MP3"),
             patch("vdl.convert.run_convert", return_value=0) as convert,
         ):
-            _convert_flow(str(src).replace(" ", "\\ "))  # chemin collé depuis le Finder
+            _convert_flow(str(src).replace(" ", "\\ "))  # path pasted from the Finder
         convert.assert_called_once_with([str(src), "-f", "mp3"])
 
     def test_prompts_for_path_when_missing(self, tmp_path):
@@ -272,4 +272,4 @@ class TestTuiModule:
     def test_enable_ansi_no_error(self):
         from vdl.tui import enable_ansi_windows
 
-        enable_ansi_windows()  # ne doit pas lever d'exception
+        enable_ansi_windows()  # must not raise

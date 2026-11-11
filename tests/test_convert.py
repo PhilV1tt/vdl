@@ -22,18 +22,18 @@ FULL_ENCODERS = frozenset({"libmp3lame", "aac", "libvorbis", "libopus", "flac", 
 
 @pytest.fixture(autouse=True)
 def _encoders(monkeypatch):
-    """Fixe la liste d'encodeurs : les tests ne doivent pas dependre du ffmpeg de la machine."""
+    """Pin the encoder list: tests must not depend on the machine's ffmpeg."""
     monkeypatch.setattr("vdl.convert.available_encoders", lambda: FULL_ENCODERS)
 
 
 def _ffmpeg_ok(cmd: list[str], **_: object) -> MagicMock:
-    """Simule ffmpeg : écrit le fichier de sortie (dernier argument)."""
+    """Fake ffmpeg: write the output file (last argument)."""
     Path(cmd[-1]).write_bytes(b"audio")
     return MagicMock(returncode=0, stderr="")
 
 
 def _convert_ok(src: Path, dst: Path, ext: str, quality: str) -> None:
-    """Simule convert_one : écrit le fichier de sortie."""
+    """Fake convert_one: write the output file."""
     dst.parent.mkdir(parents=True, exist_ok=True)
     dst.write_bytes(b"audio")
 
@@ -82,7 +82,7 @@ class TestBuildCommand:
         assert cmd[7:] == ["-c:a", "libopus", "-b:a", "256k", "out.opus"]
 
     def test_native_encoder_fallback_when_library_missing(self, monkeypatch):
-        """Le build ffmpeg 9 de Homebrew n'a plus libvorbis : on encode avec celui de ffmpeg."""
+        """Homebrew's ffmpeg 9 build no longer has libvorbis: encode with ffmpeg's native vorbis."""
         monkeypatch.setattr("vdl.convert.available_encoders", lambda: frozenset({"vorbis", "opus", "aac"}))
         assert build_command(SRC, Path("out.ogg"), "ogg", "320")[7:] == [
             "-c:a",
@@ -181,7 +181,7 @@ class TestConvertOne:
         src.write_bytes(b"\x00")
         dst = tmp_path / "out.mp3"
         dst.write_bytes(b"existing")
-        with patch("vdl.convert.subprocess.run") as run, pytest.raises(RuntimeError, match="existe déjà"):
+        with patch("vdl.convert.subprocess.run") as run, pytest.raises(RuntimeError, match="already exists"):
             convert_one(src, dst, "mp3", "320")
         run.assert_not_called()
         assert dst.read_bytes() == b"existing"

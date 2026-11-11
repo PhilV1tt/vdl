@@ -69,7 +69,7 @@ def _sanitize_title(title: str) -> str:
 
 
 def _strip_file_metadata(path: Path) -> None:
-    """Retire metadonnees globales et chapitres du fichier final, remux ffmpeg sans reencodage."""
+    """Strip global metadata and chapters from the final file with an ffmpeg remux, no re-encoding."""
     if not path.exists():
         return
     tmp = path.with_name(path.stem + ".stripped" + path.suffix)
@@ -101,7 +101,7 @@ def _strip_file_metadata(path: Path) -> None:
 
 
 def _remux_live_parts(final_path: Path) -> bool:
-    """Best-effort : remuxe les fragments d'un live interrompu (Ctrl-C) en un fichier lisible."""
+    """Best effort: remux the fragments of an interrupted live stream (Ctrl-C) into a playable file."""
     import glob
 
     pattern = glob.escape(final_path.stem) + ".f*"
@@ -128,7 +128,7 @@ def _parse_timestamp(s: str) -> float:
 
 
 def _parse_section(spec: str) -> tuple[float, float]:
-    """Parse '12:00-14:30' ou '*90-120' (secondes brutes) en (debut, fin)."""
+    """Parse '12:00-14:30' or '*90-120' (raw seconds) into (start, end)."""
     raw = spec.startswith("*")
     body = spec[1:] if raw else spec
     start_s, end_s = body.split("-", 1)
@@ -138,7 +138,7 @@ def _parse_section(spec: str) -> tuple[float, float]:
 
 
 def probe(url: str, *, single: bool = True) -> dict[str, Any] | None:
-    """Extraction legere : dict complet pour une video seule, entrees a plat pour une playlist/chaine.
+    """Light extraction: full dict for a single video, flat entries for a playlist/channel.
 
     A video link targets that video even when YouTube appends a radio or playlist.
     """
@@ -161,7 +161,7 @@ def probe(url: str, *, single: bool = True) -> dict[str, Any] | None:
 
 
 def kind(info: dict[str, Any]) -> str:
-    """Classe un dict probe : video, playlist, live ou upcoming."""
+    """Classify a probe dict: video, playlist, live or upcoming."""
     live_status = info.get("live_status")
     if live_status == "is_upcoming":
         return "upcoming"
@@ -181,7 +181,7 @@ def _print_upcoming(info: dict[str, Any]) -> None:
 
 
 def list_formats(url: str) -> int:
-    """Affiche les formats disponibles (ids yt-dlp) sans rien telecharger."""
+    """Print the available formats (yt-dlp ids), downloading nothing."""
     import yt_dlp
 
     opts: dict[str, Any] = {"listformats": True, "quiet": False, "no_warnings": True}
@@ -314,7 +314,7 @@ class Downloader:
         audio_kbps: str = "320",
         info: dict[str, Any] | None = None,
     ) -> DownloadResult:
-        """`info` sert uniquement a afficher le titre tout de suite (voir plus bas)."""
+        """`info` is only used to show the title right away (see below)."""
         import time
 
         import yt_dlp
@@ -322,10 +322,10 @@ class Downloader:
         from .progress import ProgressPrinter
 
         printer = ProgressPrinter()
-        # Un probe vient d'une autre instance YoutubeDL. Ses URLs de format sont liees a
-        # cette session-la (visitor data, nsig, po_token) et YouTube les refuse en 403 des
-        # qu'on telecharge depuis une autre instance. On ne garde donc que le titre ;
-        # l'info qui sert au telechargement est toujours reextraite ci-dessous.
+        # A probe comes from another YoutubeDL instance. Its format URLs are tied to
+        # that session (visitor data, nsig, po_token) and YouTube answers 403 as soon as
+        # they are downloaded from another instance. So keep only the title;
+        # the info used for the download is always re-extracted below.
         if info:
             printer.title = str(info.get("title") or "")
         final_path: Path | None = None
@@ -355,7 +355,7 @@ class Downloader:
 
         for attempt in range(1, self.retries + 1):
             try:
-                logger.info("Recuperation des infos pour %s", url)
+                logger.info("Fetching info for %s", url)
                 with Spinner(t("fetching")), yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     current_info = ydl.extract_info(url, download=False)
                     if current_info is None:
@@ -367,7 +367,7 @@ class Downloader:
                         return DownloadResult(0)
 
                     if live_status == "is_live" and self.live_from_start is not False:
-                        # le flag doit etre pose avant l'extraction pour influencer le choix de format
+                        # the flag must be set before extraction to influence the format choice
                         ydl.params["live_from_start"] = True
                         current_info = ydl.extract_info(url, download=False)
                         if current_info is None:
@@ -433,7 +433,7 @@ class Downloader:
 
             except Exception as e:
                 printer.done()
-                print(f"Erreur : {e}", file=sys.stderr)
+                print(f"Error: {e}", file=sys.stderr)
                 return DownloadResult(1)
 
         return DownloadResult(1)

@@ -1,4 +1,4 @@
-"""Helpers TUI basés sur questionary - navigation clavier cross-platform."""
+"""Terminal UI helpers built on questionary: cross-platform keyboard navigation."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import time
 
 
 def enable_ansi_windows() -> None:
-    """Active les codes ANSI et le copier-coller dans le terminal Windows."""
+    """Enable ANSI codes and copy-paste in the Windows terminal."""
     if sys.platform != "win32":
         return
     try:
@@ -59,7 +59,7 @@ def _supports_color() -> bool:
 
 
 def c(text: str, code: str) -> str:
-    """Enveloppe text avec un code couleur ANSI si le terminal le supporte."""
+    """Wrap text in an ANSI color code if the terminal supports it."""
     if not _supports_color():
         return text
     return f"{code}{text}{RESET}"
@@ -69,14 +69,14 @@ def c(text: str, code: str) -> str:
 
 
 def clear_screen() -> None:
-    """Efface le terminal (seulement si TTY)."""
+    """Clear the terminal (only on a TTY)."""
     if _supports_color():
         sys.stdout.write("\033[2J\033[H")
         sys.stdout.flush()
 
 
 def type_print(text: str, prefix: str = "", delay: float = 0.025) -> None:
-    """Effet machine à écrire. Dégradé vers plain print si pas TTY."""
+    """Typewriter effect. Falls back to a plain print without a TTY."""
     if not _supports_color():
         print(prefix + text)
         return
@@ -102,7 +102,7 @@ def success_flash(message: str) -> None:
 
 
 def fade_out(message: str, color: str = "") -> None:
-    """Affiche un message qui s'estompe (bold → dim)."""
+    """Print a message that fades out (bold → dim)."""
     col = color if color else CYAN
     if not _supports_color():
         print(f"  {message}")
@@ -120,7 +120,7 @@ _SPIN_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "
 
 
 class Spinner:
-    """Spinner animé à utiliser comme context manager."""
+    """Animated spinner, used as a context manager."""
 
     def __init__(self, message: str) -> None:
         self._message = message
@@ -184,7 +184,7 @@ def select(
     choices: list[str] | list[dict[str, str]],
     default: str | None = None,
 ) -> str | None:
-    """Menu avec navigation flèches. Retourne la valeur choisie ou None si annulé."""
+    """Arrow-key menu. Return the chosen value, or None if cancelled."""
     try:
         import questionary
 
@@ -195,7 +195,7 @@ def select(
 
 
 def text(message: str, default: str = "") -> str | None:
-    """Saisie texte avec historique clavier. Retourne None si annulé."""
+    """Text input with keyboard history. Return None if cancelled."""
     try:
         import questionary
 
@@ -206,7 +206,7 @@ def text(message: str, default: str = "") -> str | None:
 
 
 def confirm(message: str, default: bool = True) -> bool:
-    """Confirmation oui/non. Retourne True si oui."""
+    """Yes/no confirmation. Return True for yes."""
     try:
         import questionary
 
@@ -217,7 +217,7 @@ def confirm(message: str, default: bool = True) -> bool:
 
 
 def autocomplete(message: str, choices: list[str], default: str = "") -> str | None:
-    """Saisie avec autocomplétion. Retourne None si annulé."""
+    """Input with autocompletion. Return None if cancelled."""
     try:
         import questionary
 
@@ -228,7 +228,7 @@ def autocomplete(message: str, choices: list[str], default: str = "") -> str | N
 
 
 def is_available() -> bool:
-    """Retourne True si questionary est installé."""
+    """Return True if questionary is installed."""
     try:
         import questionary  # noqa: F401
 

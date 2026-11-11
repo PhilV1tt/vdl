@@ -30,7 +30,7 @@ from .tui import (
 
 def _banner() -> None:
     print(f"\n{c('  ▸ vdl', BOLD + CYAN)}  {c(__version__, DIM)}")
-    print("  Un lien à télécharger, un fichier à convertir, un titre à rechercher.")
+    print("  A link to download, a file to convert, a title to search.")
     print(c("  /convert  /search  /history  /quit", DIM))
     print()
 
@@ -39,7 +39,7 @@ def _banner() -> None:
 
 
 def normalize_input(raw: str) -> str:
-    """Normalise une entrée utilisateur : @handle ou domaine nu -> URL complète."""
+    """Normalize user input: @handle or bare domain -> full URL."""
     raw = raw.strip()
     if not raw.startswith(("http://", "https://")):
         return normalize_channel_url(raw)
@@ -92,7 +92,7 @@ def _default_options(is_audio: bool, state: dict[str, Any], cfg: Any) -> dict[st
 
 
 def _options_screen(o: dict[str, object], is_audio: bool) -> dict[str, object] | None:
-    """Un seul niveau de profondeur : qualité, format, dossier, extrait, subs, sponsorblock, métadonnées, cookies."""
+    """One level deep: quality, format, folder, excerpt, subtitles, sponsorblock, metadata, cookies."""
     from . import presets
 
     yes, no = t("opt_yes"), t("opt_no")
@@ -107,8 +107,8 @@ def _options_screen(o: dict[str, object], is_audio: bool) -> dict[str, object] |
             {"name": f"{t('lbl_sponsorblock')}  {yes if o['sponsorblock'] else no}", "value": "sponsorblock"},
             {"name": t("opt_metadata_label"), "value": "meta"},
             {"name": f"{t('opt_cookies_label')}  {o['cookies_browser'] or t('opt_cookies_none')}", "value": "cookies"},
-            {"name": "Télécharger avec ces réglages", "value": "back"},
-            {"name": "Annuler", "value": "cancel"},
+            {"name": "Download with these settings", "value": "back"},
+            {"name": "Cancel", "value": "cancel"},
         ]
         choice = select(t("options_title"), choices=rows)
         if choice in (None, "cancel"):
@@ -154,7 +154,7 @@ def _options_screen(o: dict[str, object], is_audio: bool) -> dict[str, object] |
             o["cookies_browser"] = picked_b or None
 
 
-# ── Téléchargement ───────────────────────────────────────────────────────────
+# ── Download ───────────────────────────────────────────────────────────
 
 
 def _run_download(url: str, is_audio: bool, o: dict[str, object], info: dict[str, Any] | None) -> int:
@@ -175,7 +175,7 @@ def _run_download(url: str, is_audio: bool, o: dict[str, object], info: dict[str
         use_aria2c=bool(o["use_aria2c"]),
     )
     mode = "AUDIO" if is_audio else "VIDÉO"
-    print(c(f"\n  ↓ {mode} · {str(o['ext']).upper()} · lancement du téléchargement", BOLD + CYAN))
+    print(c(f"\n  ↓ {mode} · {str(o['ext']).upper()} · starting download", BOLD + CYAN))
     result = dl.download(url, str(o["ext"]), is_audio, quality_selector, audio_kbps, info=info)
     if result.exit_code == 0:
         prefs.remember(is_audio, quality=str(o["quality"]), fmt=str(o["ext"]), output=str(o["output_dir"]))
@@ -211,7 +211,7 @@ def _single_flow(
 
     title = info.get("title") or "Video"
     detail = "LIVE" if is_live else "playlist" if playlist else _fmt_dur(info.get("duration"))
-    print(c("\n  ✓ Lien reconnu", CYAN))
+    print(c("\n  ✓ Link recognized", CYAN))
     print(f"  {c(str(title), BOLD)}  {c(detail, DIM)}")
     video_o = _default_options(False, state, cfg)
     audio_o = _default_options(True, state, cfg)
@@ -221,21 +221,21 @@ def _single_flow(
     keys = KeyBindings()
     changed = ""
     changed_at = 0.0
-    notice = "Tes derniers réglages sont prêts."
+    notice = "Your last settings are ready."
     reduced_motion = "VDL_REDUCED_MOTION" in os.environ or "NO_COLOR" in os.environ
 
     def render() -> list[tuple[str, str]]:
         o = audio_o if is_audio else video_o
         quality = str(o["quality"])
         if is_audio:
-            quality = "sans perte" if o["ext"] in ("flac", "wav") else f"{quality} kbps"
+            quality = "lossless" if o["ext"] in ("flac", "wav") else f"{quality} kbps"
         else:
-            quality = "qualité max" if quality == "best" else f"{quality}p"
+            quality = "max quality" if quality == "best" else f"{quality}p"
         flags = []
         if o["section"]:
-            flags.append(f"extrait {o['section']}")
+            flags.append(f"excerpt {o['section']}")
         if o["subs"]:
-            flags.append("sous-titres")
+            flags.append("subtitles")
         if o["sponsorblock"]:
             flags.append("SponsorBlock")
         details = f" · {', '.join(flags)}" if flags else ""
@@ -248,24 +248,24 @@ def _single_flow(
             (active if not is_audio else hint, " ▸ VIDÉO " if not is_audio else "   VIDÉO "),
             ("", "  "),
             (active if is_audio else hint, " ▸ AUDIO " if is_audio else "   AUDIO "),
-            (hint, "   Tab pour basculer\n\n  "),
+            (hint, "   Tab to switch\n\n  "),
             (hint, "FORMAT   "),
             (flash if changed == "ext" else accent, f"[ {str(o['ext']).upper()} ]"),
-            (hint, "  ↑ ↓    QUALITÉ   "),
+            (hint, "  ↑ ↓    QUALITY   "),
             (flash if changed == "quality" else accent, f"[ {quality} ]"),
             (hint, "  ← →\n"),
             ("", f"  → {o['output_dir']}{details}\n\n  "),
             ("fg:ansigreen", f"✓ {notice}\n\n  "),
-            (active, " ↵ Télécharger "),
+            (active, " ↵ Download "),
             ("", "   "),
             (accent, "a"),
             ("", " audio direct   "),
             (accent, "v"),
-            ("", " vidéo directe"),
+            ("", " direct video"),
         ]
         if sys.platform == "darwin":
             fragments += [(accent, "   m"), ("", " Apple Music")]
-        fragments += [(hint, "\n\n  d dossier   e extrait   o options   Échap retour\n")]
+        fragments += [(hint, "\n\n  d folder   e excerpt   o options   Esc back\n")]
         return fragments
 
     @keys.add("tab")
@@ -273,7 +273,7 @@ def _single_flow(
         nonlocal is_audio, changed, changed_at, notice
         is_audio = not is_audio
         changed, changed_at = "mode", time.monotonic()
-        notice = "Audio sélectionné." if is_audio else "Vidéo sélectionnée."
+        notice = "Audio selected." if is_audio else "Video selected."
 
     @keys.add("left")
     @keys.add("right")
@@ -285,7 +285,7 @@ def _single_flow(
         o = audio_o if is_audio else video_o
         if key in (Keys.Left, Keys.Right):
             if is_audio and o["ext"] in ("flac", "wav"):
-                notice = "Format sans perte : aucun débit à régler."
+                notice = "Lossless format: no bitrate to set."
                 return
             values = [q["value"] for q in presets.AUDIO_QUALITIES] if is_audio else presets.QUALITY_KEYS
             field = "quality"
@@ -295,7 +295,7 @@ def _single_flow(
         step = 1 if key in (Keys.Right, Keys.Down) else -1
         o[field] = values[(values.index(str(o[field])) + step) % len(values)]
         changed, changed_at = field, time.monotonic()
-        notice = f"{'Format' if field == 'ext' else 'Qualité'} : {str(o[field]).upper()}."
+        notice = f"{'Format' if field == 'ext' else 'Quality'} : {str(o[field]).upper()}."
         if event.app.loop is not None and not reduced_motion:
             event.app.loop.call_later(0.2, event.app.invalidate)
 
@@ -330,10 +330,10 @@ def _single_flow(
         o = audio_o if is_audio else video_o
         if action in ("d", "e"):
             field = "output_dir" if action == "d" else "section"
-            value = text("Dossier" if action == "d" else "Extrait (ex. 12:00-14:30)", default=str(o[field] or ""))
+            value = text("Folder" if action == "d" else "Excerpt (e.g. 12:00-14:30)", default=str(o[field] or ""))
             if value is not None and (value.strip() or field == "section"):
                 o[field] = value.strip() or None
-                notice = "Dossier modifié." if field == "output_dir" else "Extrait modifié."
+                notice = "Folder updated." if field == "output_dir" else "Excerpt updated."
         elif action == "o":
             chosen = _options_screen(o, is_audio)
             if chosen is None:
@@ -365,7 +365,7 @@ def _download_flow(url: str) -> int:
 
 
 def _search_flow(query: str = "", source: str | None = None) -> int:
-    """Flux recherche avec sélection du résultat."""
+    """Search flow with result selection."""
     from .search import SOURCES, search_videos
 
     source_choice = source or select(
@@ -417,7 +417,7 @@ def _history_flow() -> None:
 
 
 def _convert_flow(path: str | None = None) -> None:
-    """Convertit un fichier local : chemin -> audio/video -> format -> qualite."""
+    """Convert a local file: path -> audio/video -> format -> quality."""
     from . import presets
     from .convert import local_path, run_convert
 
@@ -438,7 +438,7 @@ def _convert_flow(path: str | None = None) -> None:
     run_convert([str(src), "-f", ext.lower()])
 
 
-# ── Point d'entrée principal ───────────────────────────────────────────────
+# ── Main entry point ───────────────────────────────────────────────
 
 
 def run_interactive() -> None:
@@ -446,7 +446,7 @@ def run_interactive() -> None:
     from .convert import is_local_target, local_path
 
     while True:
-        raw = text("Lien, fichier ou recherche (Entrée pour quitter)")
+        raw = text("Link, file or search (Enter to quit)")
         if not raw or not raw.strip() or raw.strip() == "/quit":
             return
         raw = raw.strip()

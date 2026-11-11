@@ -1,7 +1,7 @@
-"""Mémoire des derniers choix explicites. Chaîne : explicite > mémoire > config > défaut.
+"""Memory of the last explicit choices. Precedence: explicit > memory > config > default.
 
-Le format est retenu séparément côté audio et côté vidéo (video_format / audio_format)
-pour qu'un choix fait en vidéo ne déteigne jamais sur l'audio, et inversement.
+The format is remembered separately for audio and video (video_format / audio_format),
+so a video choice never leaks into audio, and the other way round.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ STATE_PATH = Path.home() / ".local" / "share" / "vdl" / "state.json"
 
 
 def recall() -> dict[str, Any]:
-    """Charge les derniers choix explicites, ou {} si aucun."""
+    """Load the last explicit choices, or {} if there are none."""
     if not STATE_PATH.exists():
         return {}
     try:
@@ -34,7 +34,7 @@ def resolve(
     state: dict[str, Any],
     cfg: Any,
 ) -> tuple[str, str, str]:
-    """Résout qualité/format/dossier : explicite > mémoire > config > défaut."""
+    """Resolve quality, format and folder: explicit > memory > config > default."""
     fmt_key = "audio_format" if is_audio else "video_format"
     valid_quality = {q["value"] for q in presets.AUDIO_QUALITIES} if is_audio else presets.QUALITY_KEYS
     remembered = state.get("audio_quality" if is_audio else "video_quality") or state.get("quality")
@@ -49,7 +49,7 @@ def resolve(
 
 
 def remember(is_audio: bool, *, quality: str | None = None, fmt: str | None = None, output: str | None = None) -> None:
-    """Mémorise uniquement les choix explicites de cette exécution (jamais les défauts résolus)."""
+    """Remember only the explicit choices of this run (never resolved defaults)."""
     if not any((quality, fmt, output)):
         return
     state = recall()
@@ -65,7 +65,7 @@ def remember(is_audio: bool, *, quality: str | None = None, fmt: str | None = No
 
 
 def reset() -> bool:
-    """Supprime la mémoire. Retourne True si un fichier existait."""
+    """Delete the memory file. Return True if one existed."""
     if STATE_PATH.exists():
         STATE_PATH.unlink()
         return True

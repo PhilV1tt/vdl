@@ -1,4 +1,4 @@
-"""Module Apple Music / iTunes : lookup MusicBrainz, écriture tags, import."""
+"""Apple Music / iTunes: MusicBrainz lookup, tag writing, import."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ def _check_deps() -> bool:
 
 
 def _auto_install_deps() -> bool:
-    """Installe mutagen et musicbrainzngs si absents. Retourne True si prêts."""
+    """Install mutagen and musicbrainzngs if missing. Return True when ready."""
     if _check_deps():
         return True
 
@@ -39,7 +39,7 @@ def _auto_install_deps() -> bool:
 
 
 def lookup_metadata(title: str, artist: str) -> dict[str, Any]:
-    """Cherche les métadonnées sur MusicBrainz. Retourne dict vide si aucun match."""
+    """Look up metadata on MusicBrainz. Return an empty dict when nothing matches."""
     try:
         import musicbrainzngs
 
@@ -74,7 +74,7 @@ def lookup_metadata(title: str, artist: str) -> dict[str, Any]:
 
 
 def write_tags(file_path: Path, metadata: dict[str, Any]) -> None:
-    """Écrit les tags dans le fichier audio via mutagen."""
+    """Write the tags into the audio file with mutagen."""
     if not metadata:
         return
     try:
@@ -162,7 +162,7 @@ def _write_vorbis(file_path: Path, metadata: dict[str, Any]) -> None:
 
 
 def import_to_music_app(file_path: Path) -> bool:
-    """Importe le fichier dans Apple Music (macOS) ou iTunes (Windows)."""
+    """Import the file into Apple Music (macOS) or iTunes (Windows)."""
     if sys.platform == "darwin":
         return _import_macos(file_path)
     if sys.platform == "win32":
@@ -196,7 +196,7 @@ def _import_windows(file_path: Path) -> bool:
 
 
 def music_pipeline(file_path: Path | None, info: dict[str, Any]) -> None:
-    """Orchestre lookup MusicBrainz → écriture tags → import Apple Music."""
+    """Run the MusicBrainz lookup, then tag writing, then the Apple Music import."""
     if file_path is None or not file_path.exists():
         return
 

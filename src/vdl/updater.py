@@ -15,9 +15,9 @@ _CACHE_PATH = Path.home() / ".config" / "vdl" / "update_check.json"
 _API_URL = "https://api.github.com/repos/PhilV1tt/vdl/releases/latest"
 _YTDLP_CACHE_PATH = Path.home() / ".config" / "vdl" / "ytdlp_check.json"
 _YTDLP_API_URL = "https://pypi.org/pypi/yt-dlp/json"
-_PIP_TIMEOUT = 180  # secondes
+_PIP_TIMEOUT = 180  # seconds
 _CHECK_INTERVAL_HOURS = 24
-_FETCH_TIMEOUT = 3  # secondes
+_FETCH_TIMEOUT = 3  # seconds
 
 _check_thread: threading.Thread | None = None
 _latest_version: str | None = None
@@ -94,14 +94,14 @@ def _run_check(current: str) -> None:
 
 
 def start_update_check(current_version: str) -> None:
-    """Lance la vérification de mise à jour en arrière-plan."""
+    """Start the update check in the background."""
     global _check_thread
     _check_thread = threading.Thread(target=_run_check, args=(current_version,), daemon=True)
     _check_thread.start()
 
 
 def get_update_notification() -> str | None:
-    """Retourne un message si une mise à jour est disponible (attend max 0.5s)."""
+    """Return a message if an update is available (waits at most 0.5 s)."""
     if _check_thread is not None:
         _check_thread.join(timeout=0.5)
     if _latest_version:
@@ -112,14 +112,14 @@ def get_update_notification() -> str | None:
 
 
 def get_latest_version() -> str | None:
-    """Retourne la dernière version disponible si plus récente que l'actuelle."""
+    """Return the latest version if it is newer than the current one."""
     if _check_thread is not None:
         _check_thread.join(timeout=0.5)
     return _latest_version
 
 
 def do_update() -> None:
-    """Lance la mise à jour via pipx ou pip."""
+    """Update vdl with pipx or pip."""
     from .i18n import t
 
     pipx = "pipx"
@@ -161,18 +161,18 @@ def _latest_ytdlp_version() -> str | None:
 
 
 def _upgrade_commands() -> list[list[str]]:
-    """Commandes d'installation à essayer, dans l'ordre : pip (pipx, venv, système) puis uv (uv tool, venv uv)."""
+    """Install commands to try, in order: pip (pipx, venv, system) then uv (uv tool, uv venv)."""
     pip = [sys.executable, "-m", "pip", "install", "--upgrade", "--quiet", "yt-dlp"]
     uv = shutil.which("uv")
     uv_cmd = [uv, "pip", "install", "--python", sys.executable, "--upgrade", "--quiet", "yt-dlp"] if uv else None
     has_pip = importlib.util.find_spec("pip") is not None
-    # uv tool et les venv créés par uv n'ont pas pip : uv passe en premier
+    # uv tool and uv-created venvs have no pip: try uv first
     cmds = [pip, uv_cmd] if has_pip else [uv_cmd, pip]
     return [c for c in cmds if c]
 
 
 def upgrade_ytdlp() -> bool:
-    """Met yt-dlp à jour dans l'environnement qui exécute vdl (pipx, uv, venv ou pip). Silencieux."""
+    """Upgrade yt-dlp in the environment that runs vdl (pipx, uv, venv or pip). Silent."""
     for cmd in _upgrade_commands():
         try:
             if subprocess.run(cmd, capture_output=True, timeout=_PIP_TIMEOUT).returncode == 0:
@@ -183,10 +183,10 @@ def upgrade_ytdlp() -> bool:
 
 
 def auto_update_ytdlp() -> None:
-    """Au plus une fois par 24 h : installe la dernière version de yt-dlp si la nôtre est plus ancienne.
+    """At most once every 24 h: install the latest yt-dlp if the installed one is older.
 
-    Sans sortie ni erreur : en cas d'échec (réseau, droits), vdl continue avec la version installée.
-    À appeler avant le premier import de yt_dlp.
+    No output and no error: on failure (network, permissions) vdl keeps the installed version.
+    Call before the first import of yt_dlp.
     """
     if os.environ.get("VDL_NO_AUTO_UPDATE"):
         return
@@ -199,7 +199,7 @@ def auto_update_ytdlp() -> None:
         pass
     current, latest = _installed_ytdlp_version(), _latest_ytdlp_version()
     if latest is None:
-        return  # pas de réseau : on réessaiera au prochain lancement
+        return  # no network: retry on the next launch
     if current is not None and _parse_version(latest) > _parse_version(current) and not upgrade_ytdlp():
         return
     try:

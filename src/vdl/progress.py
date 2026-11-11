@@ -25,7 +25,7 @@ class ProgressPrinter:
     def update(self, pct: float, speed_bps: float = 0, eta_sec: int = 0) -> None:
         if not sys.stderr.isatty():
             if not self._active:
-                print("Téléchargement…", file=sys.stderr)
+                print("Downloading…", file=sys.stderr)
             self._active = True
             return
         self._active = True
@@ -46,7 +46,7 @@ class ProgressPrinter:
     def update_live(
         self, downloaded_bytes: int, frag_index: int | None, frag_count: int | None, speed_bps: float = 0
     ) -> None:
-        """Ligne de progression indéterminée (pas de total connu, ex : live en cours)."""
+        """Indeterminate progress line (no known total, e.g. a live stream in progress)."""
         if not sys.stderr.isatty():
             if not self._active:
                 print("Enregistrement en direct…", file=sys.stderr)

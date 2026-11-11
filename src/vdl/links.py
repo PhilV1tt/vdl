@@ -1,4 +1,4 @@
-"""Extraction des liens d'une chaîne ou d'une playlist, sans téléchargement."""
+"""List the links of a channel or playlist without downloading."""
 
 from __future__ import annotations
 
@@ -9,15 +9,15 @@ _CHANNEL_MARKERS = ("/@", "/channel/", "/c/", "/user/")
 
 
 def normalize_channel_url(target: str) -> str:
-    """Normalise une entrée chaîne/playlist en URL listable par yt-dlp.
+    """Normalize a channel/playlist input into a URL that yt-dlp can list.
 
     - '@handle'                     -> https://www.youtube.com/@handle/videos
     - 'youtube.com/@handle'         -> https://www.youtube.com/@handle/videos
-    - URL déjà sur un onglet/playlist -> inchangée
+    - URL already on a tab or playlist -> unchanged
     """
     target = target.strip()
 
-    # @handle nu -> URL de chaîne YouTube
+    # bare @handle -> YouTube channel URL
     if target.startswith("@"):
         return f"https://www.youtube.com/{target}/videos"
 
@@ -27,7 +27,7 @@ def normalize_channel_url(target: str) -> str:
     lower = target.lower()
     is_youtube = "youtube.com" in lower or "youtu.be" in lower
 
-    # Page de chaîne YouTube sans onglet -> on cible l'onglet des vidéos
+    # YouTube channel page without a tab -> target the videos tab
     if (
         is_youtube
         and any(marker in lower for marker in _CHANNEL_MARKERS)
@@ -40,7 +40,7 @@ def normalize_channel_url(target: str) -> str:
 
 
 def is_channel_target(raw: str) -> bool:
-    """True si l'entrée pointe une chaîne/playlist entière plutôt qu'une vidéo précise."""
+    """True if the input points to a whole channel/playlist rather than a single video."""
     raw = raw.strip()
     if raw.startswith("@"):
         return True
@@ -53,7 +53,7 @@ def is_channel_target(raw: str) -> bool:
 
 
 def extract_links(target: str) -> list[str]:
-    """Retourne toutes les URLs de vidéos d'une chaîne/playlist, sans rien télécharger."""
+    """Return the URLs of all videos of a channel/playlist, downloading nothing."""
     import yt_dlp
 
     url = normalize_channel_url(target)
@@ -71,7 +71,7 @@ def extract_links(target: str) -> list[str]:
 
     entries = info.get("entries")
     if entries is None:
-        # Vidéo unique passée directement
+        # Single video passed directly
         single = info.get("webpage_url") or info.get("url")
         return [single] if single else []
 

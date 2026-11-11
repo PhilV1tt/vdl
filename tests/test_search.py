@@ -1,4 +1,4 @@
-"""Tests pour le module de recherche."""
+"""Tests of the search module."""
 
 from unittest.mock import patch
 
@@ -77,7 +77,7 @@ class TestSearchVideos:
     def test_youtube_id_becomes_full_url(self):
         mock_entry = {
             "title": "Test",
-            "url": "abc123",  # Juste l'ID, pas une URL complète
+            "url": "abc123",  # Just the ID, not a full URL
             "duration": 60,
         }
         mock_info = {"entries": [mock_entry]}

@@ -1,4 +1,4 @@
-"""Tests pour le module de détection de mises à jour."""
+"""Tests of the update detection module."""
 
 import json
 from datetime import datetime, timedelta, timezone

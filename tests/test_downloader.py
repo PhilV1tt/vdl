@@ -146,7 +146,7 @@ class TestMetadataOptions:
         f.write_bytes(b"data")
 
         def fake_run(cmd, **kwargs):
-            # ffmpeg ecrirait le fichier de sortie : on le simule
+            # ffmpeg would write the output file: simulate it
             out = cmd[-1]
             Path(out).write_bytes(b"clean")
 
@@ -341,9 +341,9 @@ class TestListFormats:
 
 class TestLiveDownload:
     def test_probe_info_never_used_for_download(self):
-        """Le probe vient d'une autre instance YoutubeDL : ses URLs donnent un 403.
+        """The probe comes from another YoutubeDL instance: its URLs return 403.
 
-        L'info qui sert au telechargement doit toujours etre reextraite ici.
+        The info used for the download must always be re-extracted here.
         """
         probe_info = {"title": "Probe", "live_status": "not_live"}
         with patch("yt_dlp.YoutubeDL") as mock_cls:

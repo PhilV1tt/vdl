@@ -15,37 +15,37 @@ from .links import is_channel_target, normalize_channel_url
 def _make_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="vdl",
-        description="Télécharge vidéos et audio depuis n'importe quel site (YouTube, Vimeo, TikTok, SoundCloud…)",
+        description="Download video and audio from any site (YouTube, Vimeo, TikTok, SoundCloud...)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
-Exemples :
-  vdl https://youtu.be/xxx              vidéo MP4, meilleure qualité
-  vdl https://youtu.be/xxx -a           audio MP3
-  vdl https://youtu.be/xxx -q 720       vidéo 720p
-  vdl <live YouTube en cours>           enregistre depuis le début du live
-  vdl @QOVESStudio --links              liste les liens d'une chaîne (rien téléchargé)
-  vdl @QOVESStudio --links | vdl -b -   liste puis télécharge toute la chaîne
-  vdl -b liens.txt                      télécharger une liste d'URLs
-  vdl -m https://youtu.be/xxx           MP3 + import Apple Music
-  vdl convert film.mkv -f mp3           convertir un fichier local (mp3, flac, 1080p…)
-  vdl film.mov -f mp3                   convertir directement, sans sous-commande
-  vdl search "lofi hip hop"             rechercher sur YouTube
-  vdl config                            préférences effectives et leur origine
-  vdl                                   mode interactif (flèches)
+Examples:
+  vdl https://youtu.be/xxx              MP4 video, best quality
+  vdl https://youtu.be/xxx -a           MP3 audio
+  vdl https://youtu.be/xxx -q 720       720p video
+  vdl <ongoing YouTube live>            record the live from its start
+  vdl @QOVESStudio --links              list a channel's links (nothing downloaded)
+  vdl @QOVESStudio --links | vdl -b -   list, then download the whole channel
+  vdl -b links.txt                      download a list of URLs
+  vdl -m https://youtu.be/xxx           MP3 + Apple Music import
+  vdl convert film.mkv -f mp3           convert a local file (mp3, flac, 1080p...)
+  vdl film.mov -f mp3                   convert directly, no subcommand
+  vdl search "lofi hip hop"             search YouTube
+  vdl config                            effective preferences and where they come from
+  vdl                                   interactive mode (arrow keys)
 
-Réglages avancés (sous-titres, SponsorBlock, miniature, template de nom) :
-  ~/.config/vdl/config.toml   —   voir le README.
+Advanced settings (subtitles, SponsorBlock, thumbnail, name template):
+  ~/.config/vdl/config.toml   —   see the README.
 """,
     )
-    p.add_argument("url", nargs="?", help="Lien à télécharger ou fichier local à convertir")
-    p.add_argument("files", nargs="*", help="Autres fichiers locaux à convertir")
-    p.add_argument("-a", "--audio", action="store_true", help="Extraire l'audio (MP3 par défaut)")
+    p.add_argument("url", nargs="?", help="Link to download or local file to convert")
+    p.add_argument("files", nargs="*", help="More local files to convert")
+    p.add_argument("-a", "--audio", action="store_true", help="Extract the audio (MP3 by default)")
     p.add_argument(
         "-q",
         "--quality",
         default=None,
         metavar="Q",
-        help="best | 2160 | 1440 | 1080 | 720 | 480 | 360  (défaut: dernier choix, sinon best)",
+        help="best | 2160 | 1440 | 1080 | 720 | 480 | 360  (default: last choice, else best)",
     )
     p.add_argument(
         "-f",
@@ -53,67 +53,67 @@ Réglages avancés (sous-titres, SponsorBlock, miniature, template de nom) :
         metavar="FMT",
         help="mp3 m4a wav flac ogg aac opus  |  mp4 mkv webm avi mov",
     )
-    p.add_argument("-o", "--output", metavar="DOSSIER", help="Dossier pour cette commande uniquement")
-    p.add_argument("-p", "--playlist", action="store_true", help="Autoriser les playlists / chaînes entières")
+    p.add_argument("-o", "--output", metavar="DIR", help="Folder for this command only")
+    p.add_argument("-p", "--playlist", action="store_true", help="Allow whole playlists / channels")
     p.add_argument(
         "-b",
         "--batch-file",
-        metavar="FICHIER",
-        help="Fichier d'URLs, une par ligne ('-' pour lire l'entrée standard)",
+        metavar="FILE",
+        help="File of URLs, one per line ('-' reads standard input)",
     )
     p.add_argument(
         "--links",
         action="store_true",
-        help="Lister les liens d'une chaîne/playlist sur la sortie standard, sans télécharger",
+        help="Print the links of a channel/playlist to standard output, without downloading",
     )
-    p.add_argument("-m", "--music", action="store_true", help="Télécharger en MP3 et importer dans Apple Music")
+    p.add_argument("-m", "--music", action="store_true", help="Download as MP3 and import into Apple Music")
 
-    adv = p.add_argument_group("avance")
+    adv = p.add_argument_group("advanced")
     adv.add_argument(
         "-s",
         "--section",
         action="append",
-        metavar="DEBUT-FIN",
-        help="Extrait, ex 12:00-14:30 (repetable ; *DEBUT-FIN = secondes brutes)",
+        metavar="START-END",
+        help="Excerpt, e.g. 12:00-14:30 (repeatable; *START-END = raw seconds)",
     )
     adv.add_argument(
         "--cookies-from-browser",
-        metavar="NAVIGATEUR",
-        help="chrome | safari | firefox | edge | brave (contenu prive/membres/age)",
+        metavar="BROWSER",
+        help="chrome | safari | firefox | edge | brave (private / members-only / age-restricted content)",
     )
     adv.add_argument(
         "--live-from-start",
         dest="live_from_start",
         action="store_true",
         default=None,
-        help="Force l'enregistrement d'un live depuis son debut (defaut : auto-detecte)",
+        help="Force recording a live stream from its start (default: auto-detected)",
     )
     adv.add_argument(
         "--no-live-from-start",
         dest="live_from_start",
         action="store_false",
-        help="Desactive l'enregistrement depuis le debut, meme si le live est detecte",
+        help="Disable recording from the start, even if the live stream is detected",
     )
-    adv.add_argument("-F", "--list-formats", action="store_true", help="Lister les formats disponibles et quitter")
-    adv.add_argument("--format-id", metavar="ID", help="Telecharger un format yt-dlp precis (voir -F)")
+    adv.add_argument("-F", "--list-formats", action="store_true", help="List the available formats and exit")
+    adv.add_argument("--format-id", metavar="ID", help="Download a specific yt-dlp format (see -F)")
     adv.add_argument(
         "--subs",
         nargs="?",
         const="",
         default=None,
         metavar="LANG",
-        help="Telecharger les sous-titres (langue optionnelle, defaut config)",
+        help="Download subtitles (optional language, config default)",
     )
     adv.add_argument(
-        "--sponsorblock", dest="sponsorblock", action="store_true", default=None, help="Coupe les segments sponsor"
+        "--sponsorblock", dest="sponsorblock", action="store_true", default=None, help="Cut sponsor segments"
     )
-    adv.add_argument("--no-sponsorblock", dest="sponsorblock", action="store_false", help="Desactive SponsorBlock")
+    adv.add_argument("--no-sponsorblock", dest="sponsorblock", action="store_false", help="Disable SponsorBlock")
 
-    meta = p.add_argument_group("autres")
-    meta.add_argument("--history", action="store_true", help="Afficher l'historique")
-    meta.add_argument("--list-sites", action="store_true", help="Sites supportes par yt-dlp")
-    meta.add_argument("--update", action="store_true", help="Mettre à jour vdl")
-    meta.add_argument("--verbose", action="store_true", help="Logs de débogage")
+    meta = p.add_argument_group("other")
+    meta.add_argument("--history", action="store_true", help="Show the history")
+    meta.add_argument("--list-sites", action="store_true", help="Sites supported by yt-dlp")
+    meta.add_argument("--update", action="store_true", help="Update vdl and yt-dlp")
+    meta.add_argument("--verbose", action="store_true", help="Debug logs")
     meta.add_argument("--version", action="version", version=f"vdl {__version__}")
     return p
 
@@ -124,7 +124,7 @@ def _list_sites() -> None:
 
         names = [ie.IE_NAME for ie in list_extractors(age_limit=None) if not ie.IE_NAME.startswith("_")]
         print("\n".join(names))
-        print(f"\n{len(names)} extracteurs supportés")
+        print(f"\n{len(names)} supported extractors")
     except ImportError:
         from .i18n import t
 
@@ -139,14 +139,14 @@ def _do_update() -> None:
 
 
 def _validate_url(url: str) -> str | None:
-    """Retourne un message d'erreur si l'URL est invalide, None si OK."""
+    """Return an error message if the URL is invalid, None if it is fine."""
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
         return "L'URL doit commencer par http:// ou https://"
     if not parsed.netloc:
-        return "URL invalide : hôte manquant"
+        return "Invalid URL: missing host"
     if parsed.username or parsed.password:
-        return "URL invalide : les credentials embarqués ne sont pas acceptés"
+        return "Invalid URL: embedded credentials are not accepted"
     return None
 
 
@@ -157,7 +157,7 @@ def _read_batch_file(path: str) -> list[str]:
 
 
 def _run_search(query: str) -> None:
-    """Sous-commande : recherche interactive (délègue à interactive._search_flow)."""
+    """Subcommand: interactive search (delegates to interactive._search_flow)."""
     from .downloader import check_deps
     from .interactive import _search_flow
 
@@ -166,18 +166,18 @@ def _run_search(query: str) -> None:
 
 
 def _run_config(rest: list[str]) -> None:
-    """Sous-commande : préférences effectives et leur origine, ou 'reset' pour les oublier."""
+    """Subcommand: effective preferences and where they come from, or 'reset' to forget them."""
     from .config import _CONFIG_PATH, load_config
 
     if rest and rest[0] == "reset":
         removed = prefs.reset()
-        print("Préférences mémorisées supprimées." if removed else "Rien à réinitialiser.")
+        print("Remembered preferences deleted." if removed else "Nothing to reset.")
         return
 
     cfg = load_config()
     state = prefs.recall()
     print(f"config    {_CONFIG_PATH}")
-    print(f"mémoire   {prefs.STATE_PATH}")
+    print(f"memory    {prefs.STATE_PATH}")
     print()
     rows = [
         ("video_quality", state.get("video_quality") or state.get("quality"), cfg.default_quality),
@@ -196,7 +196,7 @@ def _run_config(rest: list[str]) -> None:
     ]
     for name, remembered, default in rows:
         value = remembered or default
-        origin = "mémoire" if remembered else "config"
+        origin = "memory" if remembered else "config"
         print(f"  {name:<14} {value:<24} ({origin})")
 
 
@@ -207,7 +207,7 @@ def _build_downloader(
     output_dir: str,
     playlist: bool,
 ) -> Downloader:
-    """Construit un Downloader à partir des args CLI, de la config, et du dossier/playlist déjà résolus."""
+    """Build a Downloader from the CLI args, the config, and the already resolved folder/playlist."""
     subs_lang = args.subs if args.subs else cfg.subs_lang
     return Downloader(
         output_dir=output_dir,
@@ -228,12 +228,12 @@ def _build_downloader(
 
 
 def main() -> None:
-    # ── Init plateforme ────────────────────────────────────────────────────
+    # ── Platform init ────────────────────────────────────────────────────
     from .tui import enable_ansi_windows
 
     enable_ansi_windows()
 
-    # ── Sous-commandes search / config ──────────────────────────────────────
+    # ── Subcommands search / config ──────────────────────────────────────
     raw_args = sys.argv[1:]
     if raw_args and raw_args[0] == "search":
         query = " ".join(raw_args[1:])
@@ -247,7 +247,7 @@ def main() -> None:
             from .interactive import _convert_flow
 
             if not sys.stdin.isatty():
-                _make_parser().error("Indique un fichier : vdl convert film.mov -f mp3")
+                _make_parser().error("Give a file: vdl convert film.mov -f mp3")
             _convert_flow()
             return
         from .convert import run_convert
@@ -267,14 +267,14 @@ def main() -> None:
                 if value and key not in {"url", "files", "format", "quality", "output", "audio"}
             ]
             if unsupported:
-                parser.error(f"Options réservées au téléchargement : {', '.join(unsupported)}")
+                parser.error(f"Options that only apply to downloads : {', '.join(unsupported)}")
             convert_args = [args.url, *args.files]
             for flag, value in (("-f", args.format), ("-q", args.quality), ("-o", args.output)):
                 if value:
                     convert_args.extend([flag, value])
             sys.exit(run_convert(convert_args))
     if args.files:
-        parser.error("Pour plusieurs liens, utilise vdl -b liens.txt")
+        parser.error("For several links, use vdl -b links.txt")
 
     from .updater import auto_update_ytdlp, start_update_check
 
@@ -300,20 +300,20 @@ def main() -> None:
         _do_update()
         return
 
-    # ── Extraction de liens (chaîne/playlist), sans téléchargement ─────────
+    # ── Link extraction (channel/playlist), no download ─────────
     if args.links:
         if not args.url:
-            print("Précise une chaîne ou une playlist, ex : vdl @chaine --links", file=sys.stderr)
+            print("Give a channel or a playlist, e.g. vdl @channel --links", file=sys.stderr)
             sys.exit(1)
         from .links import extract_links
 
         try:
             urls = extract_links(args.url)
         except Exception as e:
-            print(f"Erreur d'extraction : {e}", file=sys.stderr)
+            print(f"Extraction failed: {e}", file=sys.stderr)
             sys.exit(1)
         if not urls:
-            print("Aucune vidéo trouvée.", file=sys.stderr)
+            print("No video found.", file=sys.stderr)
             sys.exit(1)
         print("\n".join(urls))
         return
@@ -324,24 +324,24 @@ def main() -> None:
     check_deps()
     cfg = load_config()
 
-    # ── Formats disponibles, sans télécharger ───────────────────────────────
+    # ── Available formats, no download ───────────────────────────────
     if args.list_formats:
         if not args.url:
-            print("Précise une URL, ex : vdl <url> -F", file=sys.stderr)
+            print("Give a URL, e.g. vdl <url> -F", file=sys.stderr)
             sys.exit(1)
         from .downloader import list_formats
 
         sys.exit(list_formats(normalize_channel_url(args.url.strip())))
 
-    # ── Mode batch ──────────────────────────────────────────────────────────
+    # ── Batch mode ──────────────────────────────────────────────────────────
     if args.batch_file:
         try:
             urls = _read_batch_file(args.batch_file)
         except OSError as e:
-            print(f"Impossible de lire {args.batch_file} : {e}", file=sys.stderr)
+            print(f"Cannot read {args.batch_file} : {e}", file=sys.stderr)
             sys.exit(1)
         if not urls:
-            print("Le fichier batch est vide.", file=sys.stderr)
+            print("The batch file is empty.", file=sys.stderr)
             sys.exit(1)
 
         is_audio = args.audio or args.music or bool(args.format and args.format.lower() in presets.AUDIO_EXTS)
@@ -349,10 +349,10 @@ def main() -> None:
         quality, ext, output_dir = prefs.resolve(args.quality, args.format, args.output, is_audio, state, cfg)
         ext = ext.lower()
         if ext not in (presets.AUDIO_EXTS if is_audio else presets.VIDEO_EXTS):
-            parser.error(f"Format incompatible : {ext}")
+            parser.error(f"Incompatible format: {ext}")
         valid = [q["value"] for q in presets.AUDIO_QUALITIES] if is_audio else presets.QUALITY_KEYS
         if quality not in valid:
-            parser.error(f"Qualité inconnue : {quality}. Valeurs : {', '.join(valid)}")
+            parser.error(f"Unknown quality: {quality}. Values: {', '.join(valid)}")
         quality_selector, audio_kbps = presets.build_quality_selector(is_audio, quality)
         dl = _build_downloader(args, cfg, output_dir=output_dir, playlist=args.playlist)
 
@@ -361,7 +361,7 @@ def main() -> None:
             url = normalize_channel_url(raw)
             err = _validate_url(url)
             if err:
-                print(f"URL ignoree ({err}) : {url}", file=sys.stderr)
+                print(f"URL skipped ({err}) : {url}", file=sys.stderr)
                 fail += 1
                 continue
             result = dl.download(url, ext, is_audio, quality_selector, audio_kbps)
@@ -375,14 +375,14 @@ def main() -> None:
                 fail += 1
         if ok:
             prefs.remember(is_audio, quality=args.quality, fmt=args.format)
-        print(f"\n{ok} reussi(s), {fail} echoue(s)")
+        print(f"\n{ok} succeeded, {fail} failed")
         _show_update_notification()
         sys.exit(0 if fail == 0 else 1)
 
-    # ── Pas d'URL → mode interactif ────────────────────────────────────────
+    # ── No URL → interactive mode ────────────────────────────────────────
     if not args.url:
         if not sys.stdin.isatty() or not sys.stdout.isatty():
-            parser.error("Indique un lien ou un fichier. Pour un flux de liens : vdl -b -")
+            parser.error("Give a link or a file. To read links from a stream: vdl -b -")
         from .interactive import run_interactive
 
         run_interactive()
@@ -396,7 +396,7 @@ def main() -> None:
         print(err, file=sys.stderr)
         sys.exit(1)
 
-    # Déterminer si c'est de l'audio (--music implique --audio ; un format audio aussi)
+    # Decide whether this is audio (--music implies --audio; so does an audio format)
     is_audio = args.audio or args.music
     if not is_audio and args.format and args.format.lower() in presets.AUDIO_EXTS:
         is_audio = True
@@ -407,7 +407,7 @@ def main() -> None:
 
     if ext not in (presets.AUDIO_EXTS if is_audio else presets.VIDEO_EXTS):
         print(
-            f"Format incompatible : {ext}. Formats supportés : "
+            f"Incompatible format: {ext}. Supported formats: "
             f"{', '.join(sorted(presets.AUDIO_EXTS if is_audio else presets.VIDEO_EXTS))}",
             file=sys.stderr,
         )
@@ -415,7 +415,7 @@ def main() -> None:
 
     valid = [q["value"] for q in presets.AUDIO_QUALITIES] if is_audio else presets.QUALITY_KEYS
     if quality not in valid:
-        parser.error(f"Qualité inconnue : {quality}. Valeurs : {', '.join(valid)}")
+        parser.error(f"Unknown quality: {quality}. Values: {', '.join(valid)}")
     quality_selector, audio_kbps = presets.build_quality_selector(is_audio, quality)
     channel_mode = is_channel_target(raw_url)
     dl = _build_downloader(args, cfg, output_dir=output_dir, playlist=args.playlist or channel_mode)

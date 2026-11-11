@@ -12,7 +12,7 @@ def test_parser_defaults():
     args = parser.parse_args(["https://example.com"])
     assert args.url == "https://example.com"
     assert args.audio is False
-    assert args.quality is None  # resolu plus tard par prefs.resolve (explicite > memoire > config > "best")
+    assert args.quality is None  # resolved later by prefs.resolve (explicit > memory > config > "best")
     assert args.format is None
     assert args.playlist is False
     assert args.verbose is False
@@ -199,7 +199,7 @@ class TestListSites:
         assert "youtube" in captured.out
         assert "vimeo" in captured.out
         assert "_hidden" not in captured.out
-        assert "2 extracteurs" in captured.out
+        assert "2 supported extractors" in captured.out
 
 
 class TestCheckDeps:
