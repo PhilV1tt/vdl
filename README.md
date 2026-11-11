@@ -147,10 +147,7 @@ On a live stream that has been running for a long time (a 24/7 camera, for examp
 A bare `@handle` is completed automatically.
 
 ```bash
-vdl @QOVESStudio --links                   # Print every link of the channel
-vdl @QOVESStudio --links > links.txt       # Save the list (to sort/filter)
-vdl -b links.txt                           # Download what you kept
-vdl @QOVESStudio --links | vdl -b -        # Everything in one pass
+
 ```
 
 ### Persistent settings
