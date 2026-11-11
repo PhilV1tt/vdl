@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import importlib.util
 import json
+import os
+import shutil
+import subprocess
+import sys
 import threading
 import urllib.request
 from datetime import datetime, timezone
@@ -8,6 +13,9 @@ from pathlib import Path
 
 _CACHE_PATH = Path.home() / ".config" / "vdl" / "update_check.json"
 _API_URL = "https://api.github.com/repos/PhilV1tt/vdl/releases/latest"
+_YTDLP_CACHE_PATH = Path.home() / ".config" / "vdl" / "ytdlp_check.json"
+_YTDLP_API_URL = "https://pypi.org/pypi/yt-dlp/json"
+_PIP_TIMEOUT = 180  # secondes
 _CHECK_INTERVAL_HOURS = 24
 _FETCH_TIMEOUT = 3  # secondes
 
@@ -112,9 +120,6 @@ def get_latest_version() -> str | None:
 
 def do_update() -> None:
     """Lance la mise à jour via pipx ou pip."""
-    import subprocess
-    import sys
-
     from .i18n import t
 
     pipx = "pipx"
@@ -127,12 +132,80 @@ def do_update() -> None:
             except subprocess.CalledProcessError as e:
                 print(f"Update failed: {e}", file=sys.stderr)
                 return
-            print(f"\n{t('update_yt_dlp')}")
+            upgrade_ytdlp()
             return
     except FileNotFoundError:
         pass
     print(f"→ {t('update_pip')}", flush=True)
     try:
-        subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "vdl"], check=True)
+        subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "vdl", "yt-dlp"], check=True)
     except subprocess.CalledProcessError as e:
         print(f"Update failed: {e}", file=sys.stderr)
+
+
+def _installed_ytdlp_version() -> str | None:
+    try:
+        from yt_dlp.version import __version__
+    except ImportError:
+        return None
+    return str(__version__)
+
+
+def _latest_ytdlp_version() -> str | None:
+    try:
+        req = urllib.request.Request(_YTDLP_API_URL, headers={"User-Agent": "vdl-updater/1"})
+        with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT) as resp:
+            return str(json.loads(resp.read())["info"]["version"])
+    except Exception:
+        return None
+
+
+def _upgrade_commands() -> list[list[str]]:
+    """Commandes d'installation à essayer, dans l'ordre : pip (pipx, venv, système) puis uv (uv tool, venv uv)."""
+    pip = [sys.executable, "-m", "pip", "install", "--upgrade", "--quiet", "yt-dlp"]
+    uv = shutil.which("uv")
+    uv_cmd = [uv, "pip", "install", "--python", sys.executable, "--upgrade", "--quiet", "yt-dlp"] if uv else None
+    has_pip = importlib.util.find_spec("pip") is not None
+    # uv tool et les venv créés par uv n'ont pas pip : uv passe en premier
+    cmds = [pip, uv_cmd] if has_pip else [uv_cmd, pip]
+    return [c for c in cmds if c]
+
+
+def upgrade_ytdlp() -> bool:
+    """Met yt-dlp à jour dans l'environnement qui exécute vdl (pipx, uv, venv ou pip). Silencieux."""
+    for cmd in _upgrade_commands():
+        try:
+            if subprocess.run(cmd, capture_output=True, timeout=_PIP_TIMEOUT).returncode == 0:
+                return True
+        except (OSError, subprocess.SubprocessError):
+            continue
+    return False
+
+
+def auto_update_ytdlp() -> None:
+    """Au plus une fois par 24 h : installe la dernière version de yt-dlp si la nôtre est plus ancienne.
+
+    Sans sortie ni erreur : en cas d'échec (réseau, droits), vdl continue avec la version installée.
+    À appeler avant le premier import de yt_dlp.
+    """
+    if os.environ.get("VDL_NO_AUTO_UPDATE"):
+        return
+    try:
+        data = json.loads(_YTDLP_CACHE_PATH.read_text(encoding="utf-8"))
+        elapsed_h = (datetime.now(tz=timezone.utc) - datetime.fromisoformat(data["last_check"])).total_seconds() / 3600
+        if elapsed_h < _CHECK_INTERVAL_HOURS:
+            return
+    except (OSError, json.JSONDecodeError, KeyError, ValueError):
+        pass
+    current, latest = _installed_ytdlp_version(), _latest_ytdlp_version()
+    if latest is None:
+        return  # pas de réseau : on réessaiera au prochain lancement
+    if current is not None and _parse_version(latest) > _parse_version(current) and not upgrade_ytdlp():
+        return
+    try:
+        _YTDLP_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _YTDLP_CACHE_PATH.write_text(
+            json.dumps({"last_check": datetime.now(tz=timezone.utc).isoformat()}), encoding="utf-8"
+        )
+    except OSError:
+        pass

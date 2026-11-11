@@ -110,7 +110,6 @@ _S: dict[str, dict[str, str]] = {
         # Update
         "update_pipx": "Mise a jour via pipx...",
         "update_pip": "Mise a jour via pip...",
-        "update_yt_dlp": "Pour mettre a jour yt-dlp aussi :\n  pipx upgrade yt-dlp",
         "update_available": "Nouvelle version disponible : v{version}",
         "update_now": "Mettre a jour maintenant ?",
         # Search views
@@ -230,7 +229,6 @@ _S: dict[str, dict[str, str]] = {
         # Update
         "update_pipx": "Updating via pipx...",
         "update_pip": "Updating via pip...",
-        "update_yt_dlp": "To also update yt-dlp:\n  pipx upgrade yt-dlp",
         "update_available": "New version available: v{version}",
         "update_now": "Update now?",
         # Search views

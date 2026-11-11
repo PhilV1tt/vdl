@@ -276,8 +276,10 @@ def main() -> None:
     if args.files:
         parser.error("Pour plusieurs liens, utilise vdl -b liens.txt")
 
-    from .updater import start_update_check
+    from .updater import auto_update_ytdlp, start_update_check
 
+    if not args.update:
+        auto_update_ytdlp()
     if not (args.links or args.list_formats):
         start_update_check(__version__)
 

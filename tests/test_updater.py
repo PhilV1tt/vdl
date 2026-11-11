@@ -110,3 +110,81 @@ class TestUpdateNotification:
             start_update_check("0.3.0")
             msg = get_update_notification()
         assert msg is None or "0.3.0" not in (msg or "")
+
+
+class TestAutoUpdateYtdlp:
+    def _run(self, tmp_path: Path, monkeypatch, installed, latest, upgrade_ok=True, cache=None):
+        from vdl import updater
+
+        monkeypatch.delenv("VDL_NO_AUTO_UPDATE", raising=False)
+        cache_path = tmp_path / "ytdlp_check.json"
+        if cache is not None:
+            cache_path.write_text(json.dumps({"last_check": cache.isoformat()}))
+        with (
+            patch.object(updater, "_YTDLP_CACHE_PATH", cache_path),
+            patch.object(updater, "_installed_ytdlp_version", return_value=installed),
+            patch.object(updater, "_latest_ytdlp_version", return_value=latest),
+            patch.object(updater, "upgrade_ytdlp", return_value=upgrade_ok) as up,
+        ):
+            updater.auto_update_ytdlp()
+        return up, cache_path
+
+    def test_upgrades_when_older(self, tmp_path, monkeypatch):
+        up, cache = self._run(tmp_path, monkeypatch, "2026.10.01", "2026.10.26")
+        up.assert_called_once()
+        assert cache.exists()
+
+    def test_no_upgrade_when_current(self, tmp_path, monkeypatch):
+        up, cache = self._run(tmp_path, monkeypatch, "2026.10.26", "2026.10.26")
+        up.assert_not_called()
+        assert cache.exists()
+
+    def test_recent_check_skips(self, tmp_path, monkeypatch):
+        up, _ = self._run(tmp_path, monkeypatch, "2020.01.01", "2026.10.26", cache=datetime.now(tz=timezone.utc))
+        up.assert_not_called()
+
+    def test_failed_upgrade_retries_next_time(self, tmp_path, monkeypatch):
+        up, cache = self._run(tmp_path, monkeypatch, "2026.10.01", "2026.10.26", upgrade_ok=False)
+        up.assert_called_once()
+        assert not cache.exists()
+
+    def test_offline_is_silent(self, tmp_path, monkeypatch, capsys):
+        up, cache = self._run(tmp_path, monkeypatch, "2026.10.01", None)
+        up.assert_not_called()
+        assert not cache.exists()
+        assert capsys.readouterr() == ("", "")
+
+    def test_env_opt_out(self, tmp_path, monkeypatch):
+        from vdl import updater
+
+        monkeypatch.setenv("VDL_NO_AUTO_UPDATE", "1")
+        with patch.object(updater, "_latest_ytdlp_version") as latest:
+            updater.auto_update_ytdlp()
+        latest.assert_not_called()
+
+
+class TestUpgradeCommands:
+    def test_uses_pip_first_when_available(self):
+        from vdl import updater
+
+        with patch("importlib.util.find_spec", return_value=object()), patch("shutil.which", return_value="/bin/uv"):
+            cmds = updater._upgrade_commands()
+        assert cmds[0][1:3] == ["-m", "pip"]
+        assert cmds[1][:2] == ["/bin/uv", "pip"]
+
+    def test_uses_uv_first_without_pip(self):
+        from vdl import updater
+
+        with patch("importlib.util.find_spec", return_value=None), patch("shutil.which", return_value="/bin/uv"):
+            cmds = updater._upgrade_commands()
+        assert cmds[0][:2] == ["/bin/uv", "pip"]
+
+    def test_falls_back_to_second_command(self):
+        from vdl import updater
+
+        results = iter([1, 0])
+        with (
+            patch.object(updater, "_upgrade_commands", return_value=[["a"], ["b"]]),
+            patch("subprocess.run", side_effect=lambda *a, **k: type("R", (), {"returncode": next(results)})()),
+        ):
+            assert updater.upgrade_ytdlp() is True
